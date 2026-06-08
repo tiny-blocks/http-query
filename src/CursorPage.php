@@ -5,9 +5,12 @@ declare(strict_types=1);
 namespace TinyBlocks\HttpQuery;
 
 use Closure;
+use Psr\Http\Message\ResponseInterface;
 use TinyBlocks\Collection\Collection;
 use TinyBlocks\Http\LinkRelation;
-use TinyBlocks\HttpQuery\Internal\Window;
+use TinyBlocks\Http\Server\Response;
+use TinyBlocks\HttpQuery\Internal\Keyset;
+use TinyBlocks\HttpQuery\Internal\Limit;
 
 /**
  * Keyset (cursor) page carrying its items and the forward and backward cursors, without a total.
@@ -21,8 +24,9 @@ final readonly class CursorPage
      */
     private function __construct(
         private Collection $items,
+        private Limit $limit,
         private bool $hasNext,
-        private int $perPage,
+        private Criteria $criteria,
         private Cursor $nextCursor,
         private bool $hasPrevious,
         private Cursor $previousCursor
@@ -30,41 +34,50 @@ final readonly class CursorPage
     }
 
     /**
-     * Creates a CursorPage from the items, the key extractor, and the pagination.
+     * Creates a CursorPage from the items, the key extractor, the criteria, and the pagination.
      *
      * <p>The consumer fetches one element beyond the page size via keyset. The extra element is
      * trimmed and its presence is read as the next-page hint. The forward cursor anchors on the
      * last retained element, the backward cursor on the first.</p>
      *
-     * @param Collection<TValue> $items The items fetched for the page size plus one.
-     * @param Closure(TValue): list<mixed> $keysOf Extracts the ordering key values from an element.
+     * @template TElement
+     * @param iterable<TElement> $items The items fetched for the page size plus one.
+     * @param Closure(TElement): list<mixed> $keysOf Extracts the ordering key values from an element.
+     * @param Criteria $criteria The criteria that produced the result.
      * @param CursorPagination $pagination The pagination describing the current page.
-     * @return CursorPage<TValue> The cursor page carrying the trimmed items and the cursors.
+     * @return CursorPage<TElement> The cursor page carrying the trimmed items and the cursors.
      */
-    public static function from(Collection $items, Closure $keysOf, CursorPagination $pagination): CursorPage
-    {
-        $limit = $pagination->limit();
-        $window = Window::from(items: $items, limit: $limit);
-        $hasNext = $window->hasNext();
-        $hasPrevious = !$pagination->cursor()->isAbsent();
-
-        /** @var Collection<TValue> $trimmed */
-        $trimmed = $window->items();
-
-        $lastItem = $hasNext ? $trimmed->last() : null;
-        $firstItem = $hasPrevious ? $trimmed->first() : null;
-
-        $nextCursor = is_null($lastItem) ? Cursor::none() : Cursor::fromKeys(keys: $keysOf($lastItem));
-        $previousCursor = is_null($firstItem) ? Cursor::none() : Cursor::fromKeys(keys: $keysOf($firstItem));
+    public static function from(
+        iterable $items,
+        Closure $keysOf,
+        Criteria $criteria,
+        CursorPagination $pagination
+    ): CursorPage {
+        /** @var Collection<TElement> $collection */
+        $collection = Collection::createFrom(elements: $items);
+        $keyset = Keyset::from(items: $collection, keysOf: $keysOf, pagination: $pagination);
 
         return new CursorPage(
-            items: $trimmed,
-            hasNext: $hasNext,
-            perPage: $limit,
-            nextCursor: $nextCursor,
-            hasPrevious: $hasPrevious,
-            previousCursor: $previousCursor
+            items: $keyset->items(),
+            limit: Limit::from(value: $pagination->limit()),
+            hasNext: $keyset->hasNext(),
+            criteria: $criteria,
+            nextCursor: $keyset->next(),
+            hasPrevious: $keyset->hasPrevious(),
+            previousCursor: $keyset->previous()
         );
+    }
+
+    /**
+     * Returns the pagination for the next page, or null when there is none.
+     *
+     * @return CursorPagination|null The pagination for the next page, or null.
+     */
+    public function next(): ?CursorPagination
+    {
+        return $this->nextCursor->isAbsent()
+            ? null
+            : CursorPagination::from(cursor: $this->nextCursor, perPage: $this->limit->value());
     }
 
     /**
@@ -90,17 +103,27 @@ final readonly class CursorPage
     /**
      * Returns the cursor page as the JSON:API meta contents.
      *
-     * @return array<string, int|string|bool|null> The meta contents keyed in length-ascending order.
+     * @return array<string, int|bool> The meta contents keyed in length-ascending order.
      */
     public function metadata(): array
     {
         return [
-            'has_next'        => $this->hasNext,
-            'per_page'        => $this->perPage,
-            'next_cursor'     => $this->nextCursor->isAbsent() ? null : $this->nextCursor->toString(),
-            'has_previous'    => $this->hasPrevious,
-            'previous_cursor' => $this->previousCursor->isAbsent() ? null : $this->previousCursor->toString()
+            'has_next'     => $this->hasNext,
+            'per_page'     => $this->limit->value(),
+            'has_previous' => $this->hasPrevious
         ];
+    }
+
+    /**
+     * Returns the pagination for the previous page, or null when there is none.
+     *
+     * @return CursorPagination|null The pagination for the previous page, or null.
+     */
+    public function previous(): ?CursorPagination
+    {
+        return $this->previousCursor->isAbsent()
+            ? null
+            : CursorPagination::from(cursor: $this->previousCursor, perPage: $this->limit->value());
     }
 
     /**
@@ -110,26 +133,26 @@ final readonly class CursorPage
      */
     public function navigation(): Navigation
     {
-        $next = $this->nextCursor->isAbsent()
-            ? null
-            : CursorPagination::from(cursor: $this->nextCursor, perPage: $this->perPage);
-        $previous = $this->previousCursor->isAbsent()
-            ? null
-            : CursorPagination::from(cursor: $this->previousCursor, perPage: $this->perPage);
-
         return Navigation::empty()
-            ->with(target: $previous, relation: LinkRelation::PREVIOUS)
-            ->with(target: $next, relation: LinkRelation::NEXT);
+            ->with(target: $this->previous(), relation: LinkRelation::PREVIOUS)
+            ->with(target: $this->next(), relation: LinkRelation::NEXT);
     }
 
     /**
-     * Returns the forward cursor, absent when there is no next page.
+     * Returns the cursor page as a JSON:API response carrying the body and the RFC 8288 Link header.
      *
-     * @return Cursor The forward cursor.
+     * @param string $baseUri The base URI the navigation URIs are built on.
+     * @return ResponseInterface The response with the data, meta, and links, plus the Link header.
      */
-    public function nextCursor(): Cursor
+    public function toResponse(string $baseUri): ResponseInterface
     {
-        return $this->nextCursor;
+        $links = Links::from(baseUri: $baseUri, criteria: $this->criteria, navigation: $this->navigation());
+
+        return Response::ok([
+            'data'  => $this->items->toArray(),
+            'meta'  => $this->metadata(),
+            'links' => $links->toArray()
+        ], $links->toHeader());
     }
 
     /**
@@ -140,15 +163,5 @@ final readonly class CursorPage
     public function hasPrevious(): bool
     {
         return $this->hasPrevious;
-    }
-
-    /**
-     * Returns the backward cursor, absent when there is no previous page.
-     *
-     * @return Cursor The backward cursor.
-     */
-    public function previousCursor(): Cursor
-    {
-        return $this->previousCursor;
     }
 }

@@ -40,11 +40,11 @@ final readonly class Navigation
      *
      * <p>A null target is ignored, so the copy carries the same targets as the original.</p>
      *
-     * @param Paging|null $target The paging the target points to, or null to ignore.
+     * @param Pagination|null $target The paging the target points to, or null to ignore.
      * @param LinkRelation $relation The relation the target is reached through.
      * @return Navigation A copy carrying the original targets plus the added target.
      */
-    public function with(?Paging $target, LinkRelation $relation): Navigation
+    public function with(?Pagination $target, LinkRelation $relation): Navigation
     {
         if (is_null($target)) {
             return $this;

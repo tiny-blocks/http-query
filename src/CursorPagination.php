@@ -5,13 +5,14 @@ declare(strict_types=1);
 namespace TinyBlocks\HttpQuery;
 
 use TinyBlocks\HttpQuery\Exceptions\PageSizeOutOfRange;
+use TinyBlocks\HttpQuery\Internal\Limit;
 
 /**
  * Keyset (cursor) pagination request carrying the incoming cursor and the page size.
  */
-final readonly class CursorPagination implements Paging
+final readonly class CursorPagination implements Pagination
 {
-    private function __construct(private int $limit, private Cursor $cursor)
+    private function __construct(private Limit $limit, private Cursor $cursor)
     {
     }
 
@@ -25,16 +26,12 @@ final readonly class CursorPagination implements Paging
      */
     public static function from(Cursor $cursor, int $perPage): CursorPagination
     {
-        if ($perPage < 1) {
-            throw PageSizeOutOfRange::belowMinimum(perPage: $perPage);
-        }
-
-        return new CursorPagination(limit: $perPage, cursor: $cursor);
+        return new CursorPagination(limit: Limit::from(value: $perPage), cursor: $cursor);
     }
 
     public function limit(): int
     {
-        return $this->limit;
+        return $this->limit->value();
     }
 
     /**
@@ -47,18 +44,18 @@ final readonly class CursorPagination implements Paging
         return $this->cursor;
     }
 
-    public function toQueryString(Schema $schema): string
+    public function toQueryString(): string
     {
-        $template = '%s=%d';
-        $perPage = sprintf($template, $schema->perPageKey(), $this->limit);
+        $template = 'page[size]=%d';
+        $size = sprintf($template, $this->limit->value());
         $token = $this->cursor->toString();
 
         if ($token === '') {
-            return $perPage;
+            return $size;
         }
 
-        $template = '%s=%s&%s';
+        $template = 'page[cursor]=%s&%s';
 
-        return sprintf($template, $schema->cursorKey(), $token, $perPage);
+        return sprintf($template, $token, $size);
     }
 }

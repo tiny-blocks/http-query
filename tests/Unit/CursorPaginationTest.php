@@ -8,7 +8,6 @@ use PHPUnit\Framework\TestCase;
 use TinyBlocks\HttpQuery\Cursor;
 use TinyBlocks\HttpQuery\CursorPagination;
 use TinyBlocks\HttpQuery\Exceptions\PageSizeOutOfRange;
-use TinyBlocks\HttpQuery\Schema;
 
 final class CursorPaginationTest extends TestCase
 {
@@ -24,16 +23,16 @@ final class CursorPaginationTest extends TestCase
         self::assertSame(1, $limit);
     }
 
-    public function testToQueryStringWhenCursorAbsentThenRendersOnlyPerPage(): void
+    public function testToQueryStringWhenCursorAbsentThenRendersOnlyTheSize(): void
     {
         /** @Given a cursor pagination carrying an absent cursor and a page size */
         $pagination = CursorPagination::from(cursor: Cursor::none(), perPage: 10);
 
-        /** @When rendering it as a query string against the default schema */
-        $queryString = $pagination->toQueryString(schema: Schema::default());
+        /** @When rendering it as a query string */
+        $queryString = $pagination->toQueryString();
 
-        /** @Then it renders only the page size */
-        self::assertSame('per_page=10', $queryString);
+        /** @Then it renders only the page size in the JSON:API page family */
+        self::assertSame('page[size]=10', $queryString);
     }
 
     public function testFromWhenAbsentCursorGivenThenCarriesLimitAndAbsentCursor(): void
@@ -63,16 +62,16 @@ final class CursorPaginationTest extends TestCase
         CursorPagination::from(cursor: $cursor, perPage: 0);
     }
 
-    public function testToQueryStringWhenCursorPresentThenRendersCursorAndPerPage(): void
+    public function testToQueryStringWhenCursorPresentThenRendersCursorAndSize(): void
     {
         /** @Given a cursor pagination carrying an incoming cursor and a page size */
         $pagination = CursorPagination::from(cursor: Cursor::from(token: 'abc'), perPage: 10);
 
-        /** @When rendering it as a query string against the default schema */
-        $queryString = $pagination->toQueryString(schema: Schema::default());
+        /** @When rendering it as a query string */
+        $queryString = $pagination->toQueryString();
 
-        /** @Then it renders the cursor token followed by the page size */
-        self::assertSame('cursor=abc&per_page=10', $queryString);
+        /** @Then it renders the cursor token followed by the page size in the JSON:API page family */
+        self::assertSame('page[cursor]=abc&page[size]=10', $queryString);
     }
 
     public function testFromWhenIncomingCursorGivenThenCarriesLimitAndTheCursorToken(): void

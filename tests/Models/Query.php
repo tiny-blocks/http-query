@@ -5,7 +5,7 @@ declare(strict_types=1);
 namespace Test\TinyBlocks\HttpQuery\Models;
 
 use Nyholm\Psr7\ServerRequest;
-use TinyBlocks\Http\Server\Decoded\QueryParameters;
+use Psr\Http\Message\ServerRequestInterface;
 
 final class Query
 {
@@ -13,8 +13,8 @@ final class Query
     {
     }
 
-    public static function from(array $parameters): QueryParameters
+    public static function from(array $parameters): ServerRequestInterface
     {
-        return QueryParameters::from(request: new ServerRequest(method: 'GET', uri: '/')->withQueryParams($parameters));
+        return new ServerRequest(method: 'GET', uri: '/')->withQueryParams($parameters);
     }
 }

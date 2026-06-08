@@ -60,7 +60,7 @@ final class FilterTest extends TestCase
         $query = Query::from(parameters: []);
 
         /** @When reading the filtering specification */
-        $filter = Criteria::fromQuery(query: $query)->filtering();
+        $filter = Criteria::fromQuery(request: $query)->filtering();
 
         /** @Then the filter is an empty group joined by the AND connective */
         self::assertEquals(Group::of(filters: [], operator: LogicalOperator::AND), $filter);
@@ -72,7 +72,7 @@ final class FilterTest extends TestCase
         $query = Query::from(parameters: ['filter' => 'a==1,b==2']);
 
         /** @When reading the filtering specification */
-        $filter = Criteria::fromQuery(query: $query)->filtering();
+        $filter = Criteria::fromQuery(request: $query)->filtering();
 
         /** @Then the filter is an OR group joining the two comparison children in order */
         self::assertEquals(Group::of(filters: [
@@ -87,7 +87,7 @@ final class FilterTest extends TestCase
         $query = Query::from(parameters: ['filter' => 'a==1;b==2']);
 
         /** @When reading the filtering specification */
-        $filter = Criteria::fromQuery(query: $query)->filtering();
+        $filter = Criteria::fromQuery(request: $query)->filtering();
 
         /** @Then the filter is an AND group joining the two comparison children in order */
         self::assertEquals(Group::of(filters: [
@@ -102,7 +102,7 @@ final class FilterTest extends TestCase
         $query = Query::from(parameters: ['filter' => 'role=in=(admin,user)']);
 
         /** @When reading the filtering specification */
-        $filter = Criteria::fromQuery(query: $query)->filtering();
+        $filter = Criteria::fromQuery(request: $query)->filtering();
 
         /** @Then the filter is an IN comparison carrying every listed value in order */
         self::assertEquals(Comparison::of(field: 'role', values: ['admin', 'user'], operator: Operator::IN), $filter);
@@ -156,7 +156,7 @@ final class FilterTest extends TestCase
         $query = Query::from(parameters: ['filter' => 'a==1;b==2,c==3']);
 
         /** @When reading the filtering specification */
-        $filter = Criteria::fromQuery(query: $query)->filtering();
+        $filter = Criteria::fromQuery(request: $query)->filtering();
 
         /** @Then the top filter is an OR group whose first child is the tighter AND group */
         self::assertEquals(Group::of(filters: [
@@ -174,7 +174,7 @@ final class FilterTest extends TestCase
         $query = Query::from(parameters: ['filter' => 'role=out=(a,b)']);
 
         /** @When reading the filtering specification */
-        $filter = Criteria::fromQuery(query: $query)->filtering();
+        $filter = Criteria::fromQuery(request: $query)->filtering();
 
         /** @Then the filter is a NOT_IN comparison carrying every listed value in order */
         self::assertEquals(Comparison::of(field: 'role', values: ['a', 'b'], operator: Operator::NOT_IN), $filter);
@@ -219,7 +219,7 @@ final class FilterTest extends TestCase
         $query = Query::from(parameters: ['filter' => 'name=="John Doe"']);
 
         /** @When reading the filtering specification */
-        $filter = Criteria::fromQuery(query: $query)->filtering();
+        $filter = Criteria::fromQuery(request: $query)->filtering();
 
         /** @Then the comparison carries the value with the surrounding quotes stripped */
         self::assertEquals(Comparison::of(field: 'name', values: ['John Doe'], operator: Operator::EQUAL), $filter);
@@ -231,7 +231,7 @@ final class FilterTest extends TestCase
         $query = Query::from(parameters: ['filter' => "name=='John Doe'"]);
 
         /** @When reading the filtering specification */
-        $filter = Criteria::fromQuery(query: $query)->filtering();
+        $filter = Criteria::fromQuery(request: $query)->filtering();
 
         /** @Then the comparison carries the value with the surrounding quotes stripped */
         self::assertEquals(Comparison::of(field: 'name', values: ['John Doe'], operator: Operator::EQUAL), $filter);
@@ -255,7 +255,7 @@ final class FilterTest extends TestCase
         $query = Query::from(parameters: ['filter' => '(a==1,b==2);c==3']);
 
         /** @When reading the filtering specification */
-        $filter = Criteria::fromQuery(query: $query)->filtering();
+        $filter = Criteria::fromQuery(request: $query)->filtering();
 
         /** @Then the top filter is an AND group whose first child is the parenthesized OR group */
         self::assertEquals(Group::of(filters: [
@@ -273,7 +273,7 @@ final class FilterTest extends TestCase
         $query = Query::from(parameters: ['filter' => 'status==paid']);
 
         /** @When reading the filtering specification */
-        $filter = Criteria::fromQuery(query: $query)->filtering();
+        $filter = Criteria::fromQuery(request: $query)->filtering();
 
         /** @Then the filter is an equality comparison on the named field with its value */
         self::assertEquals(Comparison::of(field: 'status', values: ['paid'], operator: Operator::EQUAL), $filter);
@@ -288,7 +288,7 @@ final class FilterTest extends TestCase
         $query = Query::from(parameters: ['filter' => $expression]);
 
         /** @When reading the filtering specification */
-        $filter = Criteria::fromQuery(query: $query)->filtering();
+        $filter = Criteria::fromQuery(request: $query)->filtering();
 
         /** @Then the filter is a comparison on the left field carrying the expected operator */
         self::assertEquals(Comparison::of(field: 'a', values: ['b'], operator: $expected), $filter);
@@ -306,7 +306,7 @@ final class FilterTest extends TestCase
         $this->expectExceptionMessage('could not be parsed');
 
         /** @When building the criteria from the query */
-        Criteria::fromQuery(query: $query);
+        Criteria::fromQuery(request: $query);
     }
 
     public function testValuesWhenComparisonGivenThenReturnsTheComparedValues(): void

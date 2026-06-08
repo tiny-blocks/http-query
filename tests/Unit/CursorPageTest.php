@@ -5,8 +5,10 @@ declare(strict_types=1);
 namespace Test\TinyBlocks\HttpQuery\Unit;
 
 use PHPUnit\Framework\TestCase;
+use Test\TinyBlocks\HttpQuery\Models\Query;
 use TinyBlocks\Collection\Collection;
 use TinyBlocks\Http\LinkRelation;
+use TinyBlocks\HttpQuery\Criteria;
 use TinyBlocks\HttpQuery\Cursor;
 use TinyBlocks\HttpQuery\CursorPage;
 use TinyBlocks\HttpQuery\CursorPagination;
@@ -14,12 +16,60 @@ use TinyBlocks\HttpQuery\NavigationTarget;
 
 final class CursorPageTest extends TestCase
 {
+    private Criteria $criteria;
+
+    protected function setUp(): void
+    {
+        $this->criteria = Criteria::fromQuery(request: Query::from(parameters: []));
+    }
+
+    public function testToResponseWhenCursorPageGivenThenRendersBodyAndLinkHeader(): void
+    {
+        /** @Given an opaque token produced from ordering key values */
+        $token = Cursor::fromKeys(keys: [5])->toString();
+
+        /** @And query parameters carrying that cursor and a page size of two */
+        $query = Query::from(parameters: ['page' => ['cursor' => $token, 'size' => '2']]);
+
+        /** @And the criteria parsed from those parameters */
+        $criteria = Criteria::fromQuery(request: $query);
+
+        /** @And a cursor page built from the criteria over items fetched for the page size plus one */
+        $page = $criteria->cursorPage(items: [10, 20, 30], keysOf: static fn(mixed $element): array => [$element]);
+
+        /** @When rendering the cursor page as a JSON:API response over the orders base URI */
+        $response = $page->toResponse(baseUri: '/v1/orders');
+
+        /** @Then the response body carries the trimmed data, the meta, and the keyset links */
+        self::assertSame([
+            'data'  => [10, 20],
+            'meta'  => [
+                'has_next'     => true,
+                'per_page'     => 2,
+                'has_previous' => true
+            ],
+            'links' => [
+                'self' => sprintf('/v1/orders?page[cursor]=%s&page[size]=2', $token),
+                'prev' => sprintf('/v1/orders?page[cursor]=%s&page[size]=2', Cursor::fromKeys(keys: [10])->toString()),
+                'next' => sprintf('/v1/orders?page[cursor]=%s&page[size]=2', Cursor::fromKeys(keys: [20])->toString())
+            ]
+        ], json_decode($response->getBody()->getContents(), true));
+
+        /** @And the Link header folds the self, previous, and next relations */
+        self::assertSame(implode(', ', [
+            sprintf('</v1/orders?page[cursor]=%s&page[size]=2>; rel="self"', $token),
+            sprintf('</v1/orders?page[cursor]=%s&page[size]=2>; rel="prev"', Cursor::fromKeys(keys: [10])->toString()),
+            sprintf('</v1/orders?page[cursor]=%s&page[size]=2>; rel="next"', Cursor::fromKeys(keys: [20])->toString())
+        ]), $response->getHeaderLine('Link'));
+    }
+
     public function testNavigationWhenExtraElementFetchedThenListsOnlyTheNextTarget(): void
     {
         /** @Given a keyset page fetched for the page size plus one with an absent incoming cursor */
         $page = CursorPage::from(
             items: Collection::createFrom(elements: [10, 20, 30]),
             keysOf: static fn(mixed $element): array => [$element],
+            criteria: $this->criteria,
             pagination: CursorPagination::from(cursor: Cursor::none(), perPage: 2)
         );
 
@@ -51,6 +101,7 @@ final class CursorPageTest extends TestCase
         $page = CursorPage::from(
             items: $items,
             keysOf: static fn(mixed $element): array => [$element],
+            criteria: $this->criteria,
             pagination: $pagination
         );
 
@@ -63,22 +114,20 @@ final class CursorPageTest extends TestCase
         /** @And the page has no previous page */
         self::assertFalse($page->hasPrevious());
 
-        /** @And the forward cursor anchors on the last retained element */
-        self::assertSame([20], $page->nextCursor()->toArray());
+        /** @And the next pagination anchors on the last retained element with the page size */
+        self::assertEquals(
+            CursorPagination::from(cursor: Cursor::fromKeys(keys: [20]), perPage: 2),
+            $page->next()
+        );
 
-        /** @And the forward cursor is present */
-        self::assertFalse($page->nextCursor()->isAbsent());
+        /** @And there is no previous pagination */
+        self::assertNull($page->previous());
 
-        /** @And the backward cursor is absent */
-        self::assertTrue($page->previousCursor()->isAbsent());
-
-        /** @And the metadata carries every navigation flag and cursor in declared key order */
+        /** @And the metadata carries every navigation flag in length-ascending key order */
         self::assertSame([
-            'has_next'        => true,
-            'per_page'        => 2,
-            'next_cursor'     => Cursor::fromKeys(keys: [20])->toString(),
-            'has_previous'    => false,
-            'previous_cursor' => null
+            'has_next'     => true,
+            'per_page'     => 2,
+            'has_previous' => false
         ], $page->metadata());
     }
 
@@ -91,6 +140,7 @@ final class CursorPageTest extends TestCase
         $page = CursorPage::from(
             items: Collection::createFrom(elements: [10, 20]),
             keysOf: static fn(mixed $element): array => [$element],
+            criteria: $this->criteria,
             pagination: CursorPagination::from(cursor: Cursor::from(token: $token), perPage: 2)
         );
 
@@ -125,6 +175,7 @@ final class CursorPageTest extends TestCase
         $page = CursorPage::from(
             items: $items,
             keysOf: static fn(mixed $element): array => [$element],
+            criteria: $this->criteria,
             pagination: $pagination
         );
 
@@ -134,10 +185,20 @@ final class CursorPageTest extends TestCase
         /** @And the page has a previous page */
         self::assertTrue($page->hasPrevious());
 
-        /** @And the forward cursor is absent */
-        self::assertTrue($page->nextCursor()->isAbsent());
+        /** @And there is no next pagination */
+        self::assertNull($page->next());
 
-        /** @And the backward cursor anchors on the first retained element */
-        self::assertSame([10], $page->previousCursor()->toArray());
+        /** @And the previous pagination anchors on the first retained element with the page size */
+        self::assertEquals(
+            CursorPagination::from(cursor: Cursor::fromKeys(keys: [10]), perPage: 2),
+            $page->previous()
+        );
+
+        /** @And the metadata carries every navigation flag in length-ascending key order */
+        self::assertSame([
+            'has_next'     => false,
+            'per_page'     => 2,
+            'has_previous' => true
+        ], $page->metadata());
     }
 }

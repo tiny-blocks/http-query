@@ -11,18 +11,18 @@ use TinyBlocks\Http\LinkRelation;
  */
 final readonly class NavigationTarget
 {
-    private function __construct(private Paging $target, private LinkRelation $relation)
+    private function __construct(private Pagination $target, private LinkRelation $relation)
     {
     }
 
     /**
      * Creates a NavigationTarget from a paging target and the relation it carries.
      *
-     * @param Paging $target The paging the target points to.
+     * @param Pagination $target The paging the target points to.
      * @param LinkRelation $relation The relation the target is reached through.
      * @return NavigationTarget The composed navigation target.
      */
-    public static function to(Paging $target, LinkRelation $relation): NavigationTarget
+    public static function to(Pagination $target, LinkRelation $relation): NavigationTarget
     {
         return new NavigationTarget(target: $target, relation: $relation);
     }
@@ -30,9 +30,9 @@ final readonly class NavigationTarget
     /**
      * Returns the paging the target points to.
      *
-     * @return Paging The paging target.
+     * @return Pagination The paging target.
      */
-    public function target(): Paging
+    public function target(): Pagination
     {
         return $this->target;
     }
