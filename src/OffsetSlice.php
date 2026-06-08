@@ -9,9 +9,9 @@ use TinyBlocks\Collection\Collection;
 use TinyBlocks\Http\LinkRelation;
 use TinyBlocks\Http\Server\Response;
 use TinyBlocks\HttpQuery\Internal\Limit;
-use TinyBlocks\HttpQuery\Internal\Offset;
-use TinyBlocks\HttpQuery\Internal\OffsetNavigator;
-use TinyBlocks\HttpQuery\Internal\PageNumber;
+use TinyBlocks\HttpQuery\Internal\Offset\Offset;
+use TinyBlocks\HttpQuery\Internal\Offset\OffsetNavigator;
+use TinyBlocks\HttpQuery\Internal\Offset\PageNumber;
 use TinyBlocks\HttpQuery\Internal\Window;
 
 /**

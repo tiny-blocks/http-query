@@ -2,7 +2,7 @@
 
 declare(strict_types=1);
 
-namespace TinyBlocks\HttpQuery\Internal;
+namespace TinyBlocks\HttpQuery\Internal\Cursor;
 
 use TinyBlocks\Encoder\Base62;
 use TinyBlocks\Encoder\Internal\Exceptions\InvalidDecoding;

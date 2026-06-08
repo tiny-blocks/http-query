@@ -59,18 +59,6 @@ final class CriteriaTest extends TestCase
         self::assertInstanceOf(OffsetPagination::class, $criteria->pagination());
     }
 
-    public function testToUriWhenAndGroupNestedInOrThenLeavesItUnwrapped(): void
-    {
-        /** @Given a criteria whose filter nests an AND group inside an OR group */
-        $criteria = Criteria::fromQuery(request: Query::from(parameters: ['filter' => 'a==1;b==2,c==3']));
-
-        /** @When serializing the criteria back to a URI */
-        $actual = $criteria->toUri(baseUri: '/v1/orders');
-
-        /** @Then the tighter-binding AND group is left unwrapped */
-        self::assertSame('/v1/orders?filter=a==1;b==2,c==3&page[number]=1&page[size]=20', $actual);
-    }
-
     public function testFromQueryWhenPerPageIsAtTheMaximumThenItIsAccepted(): void
     {
         /** @Given query parameters carrying a page size at the default maximum */
@@ -116,18 +104,6 @@ final class CriteriaTest extends TestCase
         self::assertSame(30, $page->total());
     }
 
-    public function testToUriWhenOrGroupNestedInAndThenWrapsItInParentheses(): void
-    {
-        /** @Given a criteria whose filter nests an OR group inside an AND group */
-        $criteria = Criteria::fromQuery(request: Query::from(parameters: ['filter' => '(a==1,b==2);c==3']));
-
-        /** @When serializing the criteria back to a URI */
-        $actual = $criteria->toUri(baseUri: '/v1/orders');
-
-        /** @Then the nested OR group is wrapped in parentheses */
-        self::assertSame('/v1/orders?filter=(a==1,b==2);c==3&page[number]=1&page[size]=20', $actual);
-    }
-
     public function testOffsetSliceWhenBuiltFromRequestThenReturnsOffsetSlice(): void
     {
         /** @Given a criteria parsed from a request carrying a page size of three */
@@ -141,18 +117,6 @@ final class CriteriaTest extends TestCase
 
         /** @And it reports a next page from the trimmed extra element */
         self::assertTrue($slice->hasNext());
-    }
-
-    public function testToUriWhenValueCarriesReservedCharactersThenItIsQuoted(): void
-    {
-        /** @Given a criteria whose filter value carries a space */
-        $criteria = Criteria::fromQuery(request: Query::from(parameters: ['filter' => 'name=="John Doe"']));
-
-        /** @When serializing the criteria back to a URI */
-        $actual = $criteria->toUri(baseUri: '/v1/orders');
-
-        /** @Then the value is rendered with surrounding double quotes */
-        self::assertSame('/v1/orders?filter=name=="John Doe"&page[number]=1&page[size]=20', $actual);
     }
 
     public function testFromQueryWhenCursorIsPresentThenPaginationIsCursorBased(): void
@@ -173,18 +137,6 @@ final class CriteriaTest extends TestCase
         self::assertSame('abc', $criteria->pagination()->cursor()->toString());
     }
 
-    public function testToUriWhenValueCarriesQuoteAndBackslashThenBothAreEscaped(): void
-    {
-        /** @Given a criteria whose filter value carries a double quote and a backslash */
-        $criteria = Criteria::fromQuery(request: Query::from(parameters: ['filter' => 'name=="a\"b\\\\c"']));
-
-        /** @When serializing the criteria back to a URI */
-        $actual = $criteria->toUri(baseUri: '/v1/orders');
-
-        /** @Then the quote and the backslash are escaped within the double-quoted value */
-        self::assertSame('/v1/orders?filter=name=="a\"b\\\\c"&page[number]=1&page[size]=20', $actual);
-    }
-
     public function testFromQueryWhenEmptyThenPaginationCarriesDefaultPageAndLimit(): void
     {
         /** @Given empty query parameters */
@@ -201,25 +153,6 @@ final class CriteriaTest extends TestCase
 
         /** @And it carries the default page size */
         self::assertSame(20, $criteria->pagination()->limit());
-    }
-
-    public function testWithPaginationWhenPageReplacedThenFilterAndSortArePreserved(): void
-    {
-        /** @Given a criteria parsed from a filter, a sort, a page, and a page size */
-        $criteria = Criteria::fromQuery(request: Query::from(parameters: [
-            'sort'   => '-created_at,id',
-            'page'   => ['number' => '3', 'size' => '20'],
-            'filter' => 'status==paid'
-        ]));
-
-        /** @And a replacement pagination pointing at a new page */
-        $pagination = OffsetPagination::fromPage(page: 5, perPage: 20);
-
-        /** @When replacing the pagination and serializing back to a URI */
-        $actual = $criteria->withPagination(pagination: $pagination)->toUri(baseUri: '/v1/orders');
-
-        /** @Then the URI keeps the filter and the sort while pointing at the new page */
-        self::assertSame('/v1/orders?filter=status==paid&sort=-created_at,id&page[number]=5&page[size]=20', $actual);
     }
 
     public function testFromQueryWhenCustomSchemaGivenThenAppliesItsDefaultPageSize(): void
@@ -254,25 +187,6 @@ final class CriteriaTest extends TestCase
 
         /** @When building the criteria from the query */
         Criteria::fromQuery(request: $query);
-    }
-
-    public function testToUriWhenFilterSortAndPageGivenThenRoundTripsToTheCanonicalUri(): void
-    {
-        /** @Given a criteria parsed from a filter, a sort, a page, and a page size */
-        $criteria = Criteria::fromQuery(request: Query::from(parameters: [
-            'sort'   => '-created_at,id',
-            'page'   => ['number' => '3', 'size' => '20'],
-            'filter' => 'status==paid;total=ge=100'
-        ]));
-
-        /** @When serializing the criteria back to a URI */
-        $actual = $criteria->toUri(baseUri: '/v1/orders');
-
-        /** @Then the URI preserves the filter, the sort, and the pagination */
-        self::assertSame(
-            '/v1/orders?filter=status==paid;total=ge=100&sort=-created_at,id&page[number]=3&page[size]=20',
-            $actual
-        );
     }
 
     public function testFromQueryWhenFilterSortAndPageGivenThenEachSpecificationIsParsed(): void

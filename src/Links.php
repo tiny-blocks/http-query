@@ -7,13 +7,14 @@ namespace TinyBlocks\HttpQuery;
 use TinyBlocks\Collection\Collection;
 use TinyBlocks\Http\Link;
 use TinyBlocks\Http\LinkRelation;
+use TinyBlocks\HttpQuery\Internal\Uri;
 use TinyBlocks\HttpQuery\Internal\WebLink;
 
 /**
  * Navigation of a result, rendered as a JSON:API body links object or an RFC 8288 Link header.
  *
- * <p>It renders uniformly over a {@see Navigation}, building the self link from the criteria and
- * each navigation target by swapping the criteria's pagination, so the filter and the sort are
+ * <p>It renders uniformly over a {@see Navigation}, building each URI from the criteria's filter and
+ * sort plus the pagination of the self link and of every target, so the filter and the sort are
  * preserved in every URI.</p>
  */
 final readonly class Links
@@ -35,12 +36,19 @@ final readonly class Links
      */
     public static function from(string $baseUri, Criteria $criteria, Navigation $navigation): Links
     {
-        $self = new WebLink(uri: $criteria->toUri(baseUri: $baseUri), relation: LinkRelation::SELF);
+        $uriFor = static fn(Pagination $pagination): string => Uri::from(
+            sort: $criteria->sorting(),
+            filter: $criteria->filtering(),
+            baseUri: $baseUri,
+            pagination: $pagination
+        );
+
+        $self = new WebLink(uri: $uriFor($criteria->pagination()), relation: LinkRelation::SELF);
 
         /** @var Collection<WebLink> $links */
         $links = $navigation->targets()->map(
             transformations: static fn(NavigationTarget $target): WebLink => new WebLink(
-                uri: $criteria->withPagination(pagination: $target->target())->toUri(baseUri: $baseUri),
+                uri: $uriFor($target->target()),
                 relation: $target->relation()
             )
         );

@@ -10,11 +10,11 @@ use TinyBlocks\Http\LinkRelation;
 use TinyBlocks\Http\Server\Response;
 use TinyBlocks\HttpQuery\Exceptions\TotalIsNegative;
 use TinyBlocks\HttpQuery\Internal\Limit;
-use TinyBlocks\HttpQuery\Internal\Offset;
-use TinyBlocks\HttpQuery\Internal\OffsetNavigator;
-use TinyBlocks\HttpQuery\Internal\PageCount;
-use TinyBlocks\HttpQuery\Internal\PageNumber;
-use TinyBlocks\HttpQuery\Internal\Total;
+use TinyBlocks\HttpQuery\Internal\Offset\Offset;
+use TinyBlocks\HttpQuery\Internal\Offset\OffsetNavigator;
+use TinyBlocks\HttpQuery\Internal\Offset\PageCount;
+use TinyBlocks\HttpQuery\Internal\Offset\PageNumber;
+use TinyBlocks\HttpQuery\Internal\Offset\Total;
 
 /**
  * Offset-based page carrying its items, the total element count, and the navigation targets.

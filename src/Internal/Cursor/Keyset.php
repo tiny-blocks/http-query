@@ -2,12 +2,13 @@
 
 declare(strict_types=1);
 
-namespace TinyBlocks\HttpQuery\Internal;
+namespace TinyBlocks\HttpQuery\Internal\Cursor;
 
 use Closure;
 use TinyBlocks\Collection\Collection;
 use TinyBlocks\HttpQuery\Cursor;
 use TinyBlocks\HttpQuery\CursorPagination;
+use TinyBlocks\HttpQuery\Internal\Window;
 
 /**
  * @template TValue

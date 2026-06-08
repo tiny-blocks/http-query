@@ -8,8 +8,8 @@ use TinyBlocks\HttpQuery\Exceptions\OffsetOutOfRange;
 use TinyBlocks\HttpQuery\Exceptions\PageNumberOutOfRange;
 use TinyBlocks\HttpQuery\Exceptions\PageSizeOutOfRange;
 use TinyBlocks\HttpQuery\Internal\Limit;
-use TinyBlocks\HttpQuery\Internal\Offset;
-use TinyBlocks\HttpQuery\Internal\PageNumber;
+use TinyBlocks\HttpQuery\Internal\Offset\Offset;
+use TinyBlocks\HttpQuery\Internal\Offset\PageNumber;
 
 /**
  * Offset-based pagination request whose canonical state is an offset and a limit.

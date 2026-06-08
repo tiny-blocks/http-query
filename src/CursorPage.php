@@ -9,7 +9,7 @@ use Psr\Http\Message\ResponseInterface;
 use TinyBlocks\Collection\Collection;
 use TinyBlocks\Http\LinkRelation;
 use TinyBlocks\Http\Server\Response;
-use TinyBlocks\HttpQuery\Internal\Keyset;
+use TinyBlocks\HttpQuery\Internal\Cursor\Keyset;
 use TinyBlocks\HttpQuery\Internal\Limit;
 
 /**

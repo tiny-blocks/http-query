@@ -28,7 +28,7 @@ parameters:
           path: src/Cursor.php
         # The cursor codec encodes and decodes opaque key values whose types are not known.
         - identifier: missingType.iterableValue
-          path: src/Internal/CursorCodec.php
+          path: src/Internal/Cursor/CursorCodec.php
         # Test fixtures and data providers carry raw arrays at the test boundary.
         - identifier: missingType.iterableValue
           path: tests

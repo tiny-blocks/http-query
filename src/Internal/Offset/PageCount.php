@@ -2,7 +2,9 @@
 
 declare(strict_types=1);
 
-namespace TinyBlocks\HttpQuery\Internal;
+namespace TinyBlocks\HttpQuery\Internal\Offset;
+
+use TinyBlocks\HttpQuery\Internal\Limit;
 
 final readonly class PageCount
 {

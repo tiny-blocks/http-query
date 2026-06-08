@@ -5,7 +5,7 @@ declare(strict_types=1);
 namespace TinyBlocks\HttpQuery;
 
 use TinyBlocks\HttpQuery\Exceptions\CursorIsInvalid;
-use TinyBlocks\HttpQuery\Internal\CursorCodec;
+use TinyBlocks\HttpQuery\Internal\Cursor\CursorCodec;
 
 /**
  * Opaque, URI-safe token wrapping the ordering key values of a keyset (cursor) page.

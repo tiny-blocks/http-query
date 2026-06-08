@@ -150,6 +150,18 @@ final class FilterTest extends TestCase
         self::assertSame('name=="John Doe"', $expression);
     }
 
+    public function testToExpressionWhenValueCarriesQuoteAndBackslashThenEscapesBoth(): void
+    {
+        /** @Given a comparison whose value carries a double quote and a backslash */
+        $comparison = Comparison::of(field: 'name', values: ['a"b\\c'], operator: Operator::EQUAL);
+
+        /** @When rendering it as an RSQL expression */
+        $expression = $comparison->toExpression()->value();
+
+        /** @Then the quote and the backslash are escaped within the double-quoted value */
+        self::assertSame('name=="a\\"b\\\\c"', $expression);
+    }
+
     public function testFilteringWhenMixedPrecedenceGivenThenAndBindsTighterThanOr(): void
     {
         /** @Given a query mixing AND and OR connectives without explicit grouping */

@@ -26,12 +26,6 @@ store, and it renders the response the consumer returns. Every computation is O(
 consumer supplies. The pagination style stays internal: the `Criteria` builds the result page, so the public API never
 exposes a concrete pagination type.
 
-It builds on the [tiny-blocks](https://github.com/tiny-blocks) ecosystem: it reads the query parameters of a PSR-7
-request through [`tiny-blocks/http`](https://github.com/tiny-blocks/http), carries items in a
-[`tiny-blocks/collection`](https://github.com/tiny-blocks/collection) `Collection`, encodes cursors through
-[`tiny-blocks/encoder`](https://github.com/tiny-blocks/encoder), and renders the response and its `Link` header with the
-`Response`, `Link`, and `LinkRelation` types from `tiny-blocks/http`.
-
 ## Installation
 
 ```bash
@@ -120,7 +114,8 @@ A malformed expression raises `SortExpressionIsInvalid`.
 
 ### Offset pagination
 
-When no cursor is present, `Criteria::offsetPage` builds an `OffsetPage` from the items of the current page and the total
+When no cursor is present, `Criteria::offsetPage` builds an `OffsetPage` from the items of the current page and the
+total
 element count. The page derives the offset and the total pages from the request, so the consumer never builds the
 pagination itself. The items are any `iterable`, and `items()` returns them as a `Collection`.
 
@@ -140,11 +135,12 @@ $criteria = Criteria::fromQuery(request: $request);
 $page = $criteria->offsetPage(items: $items, total: 480);
 
 $page->hasNext();     # true
+$page->metadata();    # The JSON:API meta contents
 $page->totalPages();  # 24
-$page->metadata();    # the JSON:API meta contents
 ```
 
-Use `Criteria::offsetSlice` instead of `Criteria::offsetPage` when the total is unknown. The consumer fetches one element
+Use `Criteria::offsetSlice` instead of `Criteria::offsetPage` when the total is unknown. The consumer fetches one
+element
 beyond the page size, and the `OffsetSlice` trims it and reads its presence as the next-page hint.
 
 ```php
@@ -162,7 +158,7 @@ $criteria = Criteria::fromQuery(request: $request);
 /** @var iterable<mixed> $items */
 $slice = $criteria->offsetSlice(items: $items);
 
-$slice->hasNext(); # inferred from the extra fetched element
+$slice->hasNext(); # Inferred from the extra fetched element
 ```
 
 ### Cursor pagination
@@ -189,9 +185,9 @@ $cursorPage = $criteria->cursorPage(
     keysOf: static fn(array $order): array => [$order['created_at'], $order['id']]
 );
 
-$cursorPage->hasNext();  # Inferred from the extra fetched element
-$cursorPage->next();     # The CursorPagination for the next page, or null
-$cursorPage->previous(); # The CursorPagination for the previous page, or null
+$cursorPage->next();     # The CursorPagination for the next page, or null.
+$cursorPage->hasNext();  # Inferred from the extra fetched element.
+$cursorPage->previous(); # The CursorPagination for the previous page, or null.
 ```
 
 An invalid cursor token raises `CursorIsInvalid` when it is decoded.
@@ -218,8 +214,8 @@ $response = $criteria->offsetPage(items: $items, total: 480)->toResponse(baseUri
 ```
 
 For full control over the body, assemble it from the parts. `Links::from` reads the navigation a result exposes through
-`result->navigation()`, swaps the criteria's pagination for each target, and serializes it back through `Criteria::toUri`,
-so the filter and the sort are preserved in every URI. `toArray()` returns the JSON:API body `links` object and
+`result->navigation()` and builds each URI from the criteria's filter and sort plus the pagination of every target, so
+the filter and the sort are preserved in every URI. `toArray()` returns the JSON:API body `links` object and
 `toHeader()` returns an RFC 8288 `Link`.
 
 ```php
@@ -251,22 +247,22 @@ The body carries the navigation with the filter and the sort preserved in every 
 
 ```json
 {
-  "data": [],
-  "meta": {
-    "total": 480,
-    "has_next": true,
-    "per_page": 20,
-    "total_pages": 24,
-    "current_page": 3,
-    "has_previous": true
-  },
-  "links": {
-    "self":  "/v1/orders?filter=status==paid;total=ge=100&sort=-created_at,id&page[number]=3&page[size]=20",
-    "first": "/v1/orders?filter=status==paid;total=ge=100&sort=-created_at,id&page[number]=1&page[size]=20",
-    "prev":  "/v1/orders?filter=status==paid;total=ge=100&sort=-created_at,id&page[number]=2&page[size]=20",
-    "next":  "/v1/orders?filter=status==paid;total=ge=100&sort=-created_at,id&page[number]=4&page[size]=20",
-    "last":  "/v1/orders?filter=status==paid;total=ge=100&sort=-created_at,id&page[number]=24&page[size]=20"
-  }
+    "data": [],
+    "meta": {
+        "total": 480,
+        "has_next": true,
+        "per_page": 20,
+        "total_pages": 24,
+        "current_page": 3,
+        "has_previous": true
+    },
+    "links": {
+        "self": "/v1/orders?filter=status==paid;total=ge=100&sort=-created_at,id&page[number]=3&page[size]=20",
+        "first": "/v1/orders?filter=status==paid;total=ge=100&sort=-created_at,id&page[number]=1&page[size]=20",
+        "prev": "/v1/orders?filter=status==paid;total=ge=100&sort=-created_at,id&page[number]=2&page[size]=20",
+        "next": "/v1/orders?filter=status==paid;total=ge=100&sort=-created_at,id&page[number]=4&page[size]=20",
+        "last": "/v1/orders?filter=status==paid;total=ge=100&sort=-created_at,id&page[number]=24&page[size]=20"
+    }
 }
 ```
 
@@ -346,11 +342,6 @@ Offset pagination answers "how many pages are there" and "jump to page N", which
 Cursor pagination answers "give me the next slice after this point" without a total, which scales to large collections
 and avoids the drift of offset pagination under concurrent writes. The library models both, plus an `OffsetSlice` for
 offset navigation without a total.
-
-### 04. How are the `meta` keys ordered?
-
-The keys are snake_case and ordered by key length ascending, with an alphabetical tiebreak. The order is fixed so the
-serialized response is deterministic across requests.
 
 ## License
 

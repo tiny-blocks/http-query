@@ -10,7 +10,7 @@ use ReflectionMethod;
 use TinyBlocks\Encoder\Base62;
 use TinyBlocks\HttpQuery\Cursor;
 use TinyBlocks\HttpQuery\Exceptions\CursorIsInvalid;
-use TinyBlocks\HttpQuery\Internal\CursorCodec;
+use TinyBlocks\HttpQuery\Internal\Cursor\CursorCodec;
 
 final class CursorTest extends TestCase
 {

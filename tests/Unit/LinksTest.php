@@ -5,34 +5,28 @@ declare(strict_types=1);
 namespace Test\TinyBlocks\HttpQuery\Unit;
 
 use PHPUnit\Framework\TestCase;
+use ReflectionClass;
+use ReflectionMethod;
 use Test\TinyBlocks\HttpQuery\Models\Query;
 use TinyBlocks\Collection\Collection;
 use TinyBlocks\HttpQuery\Criteria;
 use TinyBlocks\HttpQuery\Cursor;
 use TinyBlocks\HttpQuery\CursorPage;
 use TinyBlocks\HttpQuery\CursorPagination;
+use TinyBlocks\HttpQuery\Internal\Uri;
 use TinyBlocks\HttpQuery\Links;
-use TinyBlocks\HttpQuery\OffsetPage;
-use TinyBlocks\HttpQuery\OffsetPagination;
-use TinyBlocks\HttpQuery\OffsetSlice;
 
 final class LinksTest extends TestCase
 {
     public function testToArrayWhenPageIsTheLastThenOmitsTheNextRelation(): void
     {
-        /** @Given an offset pagination pointing at the last page */
-        $pagination = OffsetPagination::fromPage(page: 24, perPage: 20);
-
-        /** @And a criteria over that pagination */
-        $criteria = Criteria::fromQuery(request: Query::from(parameters: []))->withPagination(pagination: $pagination);
+        /** @Given a criteria pointing at the twenty-fourth page */
+        $criteria = Criteria::fromQuery(request: Query::from(parameters: [
+            'page' => ['number' => '24', 'size' => '20']
+        ]));
 
         /** @And a page carrying a total spanning twenty-four pages */
-        $result = OffsetPage::from(
-            items: Collection::createFrom(elements: range(1, 20)),
-            total: 480,
-            criteria: $criteria,
-            pagination: $pagination
-        );
+        $result = $criteria->offsetPage(items: Collection::createFrom(elements: range(1, 20)), total: 480);
 
         /** @When rendering the navigation for the last page */
         $links = Links::from(baseUri: '/v1/orders', criteria: $criteria, navigation: $result->navigation());
@@ -51,21 +45,15 @@ final class LinksTest extends TestCase
 
     public function testToArrayWhenSliceMiddleThenExposesSelfFirstPrevAndNext(): void
     {
-        /** @Given an offset pagination pointing at a middle page */
-        $pagination = OffsetPagination::fromPage(page: 3, perPage: 20);
-
-        /** @And a criteria carrying a filter and a sort over that pagination */
+        /** @Given a criteria carrying a filter and a sort at a middle page */
         $criteria = Criteria::fromQuery(request: Query::from(parameters: [
             'sort'   => '-created_at,id',
+            'page'   => ['number' => '3', 'size' => '20'],
             'filter' => 'status==paid'
-        ]))->withPagination(pagination: $pagination);
+        ]));
 
         /** @And a slice fetched for the page size plus one so a next page exists */
-        $result = OffsetSlice::from(
-            items: Collection::createFrom(elements: range(1, 21)),
-            criteria: $criteria,
-            pagination: $pagination
-        );
+        $result = $criteria->offsetSlice(items: Collection::createFrom(elements: range(1, 21)));
 
         /** @When rendering the navigation for the slice */
         $links = Links::from(baseUri: '/v1/orders', criteria: $criteria, navigation: $result->navigation());
@@ -106,19 +94,11 @@ final class LinksTest extends TestCase
 
     public function testToArrayWhenPageIsTheFirstThenOmitsThePreviousRelation(): void
     {
-        /** @Given an offset pagination pointing at the first page */
-        $pagination = OffsetPagination::fromPage(page: 1, perPage: 20);
-
-        /** @And a criteria over that pagination */
-        $criteria = Criteria::fromQuery(request: Query::from(parameters: []))->withPagination(pagination: $pagination);
+        /** @Given a criteria pointing at the first page */
+        $criteria = Criteria::fromQuery(request: Query::from(parameters: []));
 
         /** @And a page carrying a total spanning twenty-four pages */
-        $result = OffsetPage::from(
-            items: Collection::createFrom(elements: range(1, 20)),
-            total: 480,
-            criteria: $criteria,
-            pagination: $pagination
-        );
+        $result = $criteria->offsetPage(items: Collection::createFrom(elements: range(1, 20)), total: 480);
 
         /** @When rendering the navigation for the first page */
         $links = Links::from(baseUri: '/v1/orders', criteria: $criteria, navigation: $result->navigation());
@@ -137,18 +117,13 @@ final class LinksTest extends TestCase
 
     public function testToArrayWhenSliceMiddleThenCarriesAFirstButNoLastRelation(): void
     {
-        /** @Given an offset pagination pointing at a middle page */
-        $pagination = OffsetPagination::fromPage(page: 3, perPage: 20);
-
-        /** @And a criteria over that pagination */
-        $criteria = Criteria::fromQuery(request: Query::from(parameters: []))->withPagination(pagination: $pagination);
+        /** @Given a criteria pointing at a middle page */
+        $criteria = Criteria::fromQuery(request: Query::from(parameters: [
+            'page' => ['number' => '3', 'size' => '20']
+        ]));
 
         /** @And a slice fetched for the page size plus one so a next page exists */
-        $result = OffsetSlice::from(
-            items: Collection::createFrom(elements: range(1, 21)),
-            criteria: $criteria,
-            pagination: $pagination
-        );
+        $result = $criteria->offsetSlice(items: Collection::createFrom(elements: range(1, 21)));
 
         /** @When rendering the navigation for the slice */
         $links = Links::from(baseUri: '/v1/orders', criteria: $criteria, navigation: $result->navigation());
@@ -190,22 +165,15 @@ final class LinksTest extends TestCase
 
     public function testToHeaderWhenPageInTheMiddleThenFoldsEveryRelationIntoOneCommaJoinedValue(): void
     {
-        /** @Given an offset pagination pointing at a middle page */
-        $pagination = OffsetPagination::fromPage(page: 3, perPage: 20);
-
-        /** @And a criteria carrying a filter and a sort over that pagination */
+        /** @Given a criteria carrying a filter and a sort at a middle page */
         $criteria = Criteria::fromQuery(request: Query::from(parameters: [
             'sort'   => '-created_at,id',
+            'page'   => ['number' => '3', 'size' => '20'],
             'filter' => 'status==paid'
-        ]))->withPagination(pagination: $pagination);
+        ]));
 
         /** @And a page carrying a total spanning twenty-four pages */
-        $result = OffsetPage::from(
-            items: Collection::createFrom(elements: range(1, 20)),
-            total: 480,
-            criteria: $criteria,
-            pagination: $pagination
-        );
+        $result = $criteria->offsetPage(items: Collection::createFrom(elements: range(1, 20)), total: 480);
 
         /** @When rendering the navigation as an RFC 8288 Link header */
         $header = Links::from(baseUri: '/v1/orders', criteria: $criteria, navigation: $result->navigation())
@@ -223,22 +191,15 @@ final class LinksTest extends TestCase
 
     public function testToArrayWhenPageInTheMiddleThenExposesEveryRelationPreservingFilterAndSort(): void
     {
-        /** @Given an offset pagination pointing at a middle page */
-        $pagination = OffsetPagination::fromPage(page: 3, perPage: 20);
-
-        /** @And a criteria carrying a filter and a sort over that pagination */
+        /** @Given a criteria carrying a filter and a sort at a middle page */
         $criteria = Criteria::fromQuery(request: Query::from(parameters: [
             'sort'   => '-created_at,id',
+            'page'   => ['number' => '3', 'size' => '20'],
             'filter' => 'status==paid'
-        ]))->withPagination(pagination: $pagination);
+        ]));
 
         /** @And a page carrying a total spanning twenty-four pages */
-        $result = OffsetPage::from(
-            items: Collection::createFrom(elements: range(1, 20)),
-            total: 480,
-            criteria: $criteria,
-            pagination: $pagination
-        );
+        $result = $criteria->offsetPage(items: Collection::createFrom(elements: range(1, 20)), total: 480);
 
         /** @When rendering the navigation for the page */
         $links = Links::from(baseUri: '/v1/orders', criteria: $criteria, navigation: $result->navigation());
@@ -251,5 +212,17 @@ final class LinksTest extends TestCase
             'next'  => '/v1/orders?filter=status==paid&sort=-created_at,id&page[number]=4&page[size]=20',
             'last'  => '/v1/orders?filter=status==paid&sort=-created_at,id&page[number]=24&page[size]=20'
         ], $links->toArray());
+    }
+
+    public function testConstructorWhenInvokedThroughReflectionThenInstantiatesTheStaticOnlyUri(): void
+    {
+        /** @Given an uninitialized instance of the static-only URI assembler */
+        $uri = new ReflectionClass(Uri::class)->newInstanceWithoutConstructor();
+
+        /** @When invoking its otherwise-uncallable private constructor */
+        new ReflectionMethod(Uri::class, '__construct')->invoke($uri);
+
+        /** @Then the static-only URI assembler is instantiated */
+        self::assertInstanceOf(Uri::class, $uri);
     }
 }

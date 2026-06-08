@@ -19,18 +19,13 @@ use TinyBlocks\HttpQuery\Internal\Rsql\FilterParser;
 /**
  * Umbrella specification of a collection query, pairing filtering, sorting, and pagination.
  *
- * <p>It parses from the request query string and serializes back to a URI, so the navigation links
- * built from it preserve the filter and the sort. It also builds the result page for the items the
- * store returns, keeping the pagination style internal.</p>
+ * <p>It parses from the request query string and builds the result page for the items the store
+ * returns, keeping the pagination style internal.</p>
  */
 final readonly class Criteria
 {
-    private function __construct(
-        private PageParameters $page,
-        private Sort $sort,
-        private Filter $filter,
-        private Pagination $pagination
-    ) {
+    private function __construct(private PageParameters $page, private Sort $sort, private Filter $filter)
+    {
     }
 
     /**
@@ -58,33 +53,7 @@ final readonly class Criteria
         $filter = $expression === '' ? Group::none() : FilterParser::from(input: $expression)->parse();
         $sort = Sort::fromExpression(expression: $query->get(key: 'sort')->toString());
 
-        return new Criteria(page: $page, sort: $sort, filter: $filter, pagination: $page->resolve());
-    }
-
-    /**
-     * Returns the criteria as a URI built on the given base.
-     *
-     * @param string $baseUri The base URI the query string is appended to.
-     * @return string The URI carrying the filter, sort, and pagination.
-     */
-    public function toUri(string $baseUri): string
-    {
-        $parameters = [];
-
-        if (!$this->filter->isEmpty()) {
-            $template = 'filter=%s';
-            $parameters[] = sprintf($template, $this->filter->toExpression()->value());
-        }
-
-        if (!$this->sort->isEmpty()) {
-            $template = 'sort=%s';
-            $parameters[] = sprintf($template, $this->sort->toExpression());
-        }
-
-        $parameters[] = $this->pagination->toQueryString();
-        $template = '%s?%s';
-
-        return sprintf($template, $baseUri, implode('&', $parameters));
+        return new Criteria(page: $page, sort: $sort, filter: $filter);
     }
 
     /**
@@ -144,7 +113,7 @@ final readonly class Criteria
      */
     public function pagination(): Pagination
     {
-        return $this->pagination;
+        return $this->page->resolve();
     }
 
     /**
@@ -159,16 +128,5 @@ final readonly class Criteria
     public function offsetSlice(iterable $items): OffsetSlice
     {
         return OffsetSlice::from(items: $items, criteria: $this, pagination: $this->page->toOffset());
-    }
-
-    /**
-     * Returns a copy of the criteria with the pagination replaced.
-     *
-     * @param Pagination $pagination The pagination to apply.
-     * @return Criteria A new criteria carrying the given pagination with the filter and sort preserved.
-     */
-    public function withPagination(Pagination $pagination): Criteria
-    {
-        return new Criteria(page: $this->page, sort: $this->sort, filter: $this->filter, pagination: $pagination);
     }
 }
