@@ -10,6 +10,10 @@ use TinyBlocks\HttpQuery\Sort;
 
 final class SortKeys
 {
+    private function __construct()
+    {
+    }
+
     public static function from(Sort $sort): Closure
     {
         $orders = $sort->orders();

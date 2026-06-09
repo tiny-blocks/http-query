@@ -35,7 +35,7 @@ final class CursorCodec
 
         return $payload
                 |> base64_encode(...)
-                |> (fn($x) => strtr($x, '+/', '-_'))
-                |> (fn($x) => rtrim($x, '='));
+                |> (static fn(string $encoded): string => strtr($encoded, '+/', '-_'))
+                |> (static fn(string $encoded): string => rtrim($encoded, '='));
     }
 }

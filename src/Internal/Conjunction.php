@@ -12,6 +12,10 @@ use TinyBlocks\HttpQuery\LogicalOperator;
 
 final class Conjunction
 {
+    private function __construct()
+    {
+    }
+
     public static function from(Filter $filter, string $expression): array
     {
         if ($filter instanceof Group) {

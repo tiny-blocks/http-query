@@ -6,6 +6,10 @@ namespace TinyBlocks\HttpQuery\Internal;
 
 final class Iso8601
 {
+    private function __construct()
+    {
+    }
+
     public static function isValid(string $value): bool
     {
         $pattern = '/^\d{4}-\d{2}-\d{2}(T\d{2}:\d{2}:\d{2}(\.\d+)?(Z|[+-]\d{2}:\d{2})?)?$/';
