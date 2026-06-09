@@ -2,72 +2,76 @@
 
 declare(strict_types=1);
 
-namespace TinyBlocks\HttpQuery;
+namespace TinyBlocks\HttpQuery\Offset;
 
 use Psr\Http\Message\ResponseInterface;
 use TinyBlocks\Collection\Collection;
 use TinyBlocks\Http\LinkRelation;
-use TinyBlocks\Http\Server\Response;
 use TinyBlocks\HttpQuery\Exceptions\TotalIsNegative;
+use TinyBlocks\HttpQuery\Filter;
 use TinyBlocks\HttpQuery\Internal\Limit;
 use TinyBlocks\HttpQuery\Internal\Offset\Offset;
-use TinyBlocks\HttpQuery\Internal\Offset\OffsetNavigator;
+use TinyBlocks\HttpQuery\Internal\Offset\OffsetNavigation;
 use TinyBlocks\HttpQuery\Internal\Offset\PageCount;
 use TinyBlocks\HttpQuery\Internal\Offset\PageNumber;
 use TinyBlocks\HttpQuery\Internal\Offset\Total;
+use TinyBlocks\HttpQuery\Internal\Rendering;
+use TinyBlocks\HttpQuery\Navigation;
+use TinyBlocks\HttpQuery\Sort;
 
 /**
  * Offset-based page carrying its items, the total element count, and the navigation targets.
  *
  * @template TValue
  */
-final readonly class OffsetPage
+final readonly class Page
 {
     /**
      * @param Collection<TValue> $items
      */
     private function __construct(
-        private Collection $items,
+        private Sort $sort,
         private Total $total,
-        private Criteria $criteria,
-        private OffsetNavigator $navigator,
+        private Collection $items,
+        private Filter $filter,
+        private OffsetNavigation $paging,
         private PageCount $pageCount,
-        private PageNumber $pageNumber,
-        private OffsetPagination $pagination
+        private Pagination $pagination
     ) {
     }
 
     /**
-     * Creates an OffsetPage from the items, the total element count, the criteria, and the pagination.
+     * Creates a Page from the sort, the total element count, the items, the filter, and the pagination.
      *
      * @template TElement
-     * @param iterable<TElement> $items The items on the current page.
+     * @param Sort $sort The submitted sort preserved in every rendered URI.
      * @param int $total The total element count across every page.
-     * @param Criteria $criteria The criteria that produced the result.
-     * @param OffsetPagination $pagination The pagination describing the current page.
-     * @return OffsetPage<TElement> The page carrying the items, the total, and the navigation.
+     * @param iterable<TElement> $items The items on the current page.
+     * @param Filter $filter The filter preserved in every rendered URI.
+     * @param Pagination $pagination The pagination describing the current page.
+     * @return Page<TElement> The page carrying the items, the total, and the navigation.
      * @throws TotalIsNegative If the total is less than 0.
      */
-    public static function from(
-        iterable $items,
-        int $total,
-        Criteria $criteria,
-        OffsetPagination $pagination
-    ): OffsetPage {
+    public static function from(Sort $sort, int $total, iterable $items, Filter $filter, Pagination $pagination): Page
+    {
         $count = Total::from(value: $total);
         $limit = Limit::from(value: $pagination->limit());
-        $offset = Offset::from(value: $pagination->offset());
+        $pageCount = $count->pageCount(limit: $limit);
+        $pageNumber = PageNumber::fromOffset(limit: $limit, offset: Offset::from(value: $pagination->offset()));
 
         /** @var Collection<TElement> $collection */
         $collection = Collection::createFrom(elements: [...$items]);
 
-        return new OffsetPage(
-            items: $collection,
+        return new Page(
+            sort: $sort,
             total: $count,
-            criteria: $criteria,
-            navigator: OffsetNavigator::from(pagination: $pagination),
-            pageCount: $count->pageCount(limit: $limit),
-            pageNumber: PageNumber::fromOffset(offset: $offset, limit: $limit),
+            items: $collection,
+            filter: $filter,
+            paging: OffsetNavigation::from(
+                hasNext: $pageCount->hasPageAfter(page: $pageNumber),
+                pagination: $pagination
+            ),
+            pageCount: $pageCount,
             pagination: $pagination
         );
     }
@@ -75,31 +79,31 @@ final readonly class OffsetPage
     /**
      * Returns the pagination for the last page, or null when there is no page.
      *
-     * @return OffsetPagination|null The pagination for the last page, or null.
+     * @return Pagination|null The pagination for the last page, or null.
      */
-    public function last(): ?OffsetPagination
+    public function last(): ?Pagination
     {
-        return $this->pageCount->isEmpty() ? null : $this->navigator->atPage(page: $this->pageCount->value());
+        return $this->pageCount->isEmpty() ? null : $this->paging->atPage(page: $this->pageCount->value());
     }
 
     /**
      * Returns the pagination for the next page, or null when there is none.
      *
-     * @return OffsetPagination|null The pagination for the next page, or null.
+     * @return Pagination|null The pagination for the next page, or null.
      */
-    public function next(): ?OffsetPagination
+    public function next(): ?Pagination
     {
-        return $this->hasNext() ? $this->navigator->next() : null;
+        return $this->paging->next();
     }
 
     /**
      * Returns the pagination for the first page, or null when there is no page.
      *
-     * @return OffsetPagination|null The pagination for the first page, or null.
+     * @return Pagination|null The pagination for the first page, or null.
      */
-    public function first(): ?OffsetPagination
+    public function first(): ?Pagination
     {
-        return $this->pageCount->isEmpty() ? null : $this->navigator->first();
+        return $this->pageCount->isEmpty() ? null : $this->paging->first();
     }
 
     /**
@@ -123,23 +127,13 @@ final readonly class OffsetPage
     }
 
     /**
-     * Tells whether the current page is the last page.
-     *
-     * @return bool True when the current page is the last page.
-     */
-    public function isLast(): bool
-    {
-        return !$this->hasNext();
-    }
-
-    /**
      * Returns the zero-based offset of the current page.
      *
      * @return int The offset of the current page.
      */
     public function offset(): int
     {
-        return $this->pagination->offset();
+        return $this->paging->offset();
     }
 
     /**
@@ -149,17 +143,7 @@ final readonly class OffsetPage
      */
     public function hasNext(): bool
     {
-        return $this->pageCount->hasPageAfter(page: $this->pageNumber);
-    }
-
-    /**
-     * Tells whether the current page is the first page.
-     *
-     * @return bool True when the current page is the first page.
-     */
-    public function isFirst(): bool
-    {
-        return $this->navigator->isFirst();
+        return $this->paging->hasNext();
     }
 
     /**
@@ -171,22 +155,22 @@ final readonly class OffsetPage
     {
         return [
             'total'        => $this->total->value(),
-            'has_next'     => $this->hasNext(),
-            'per_page'     => $this->pagination->limit(),
+            'has_next'     => $this->paging->hasNext(),
+            'per_page'     => $this->paging->limit(),
             'total_pages'  => $this->pageCount->value(),
-            'current_page' => $this->pageNumber->value(),
-            'has_previous' => $this->hasPrevious()
+            'current_page' => $this->paging->currentPage(),
+            'has_previous' => $this->paging->hasPrevious()
         ];
     }
 
     /**
      * Returns the pagination for the previous page, or null when there is none.
      *
-     * @return OffsetPagination|null The pagination for the previous page, or null.
+     * @return Pagination|null The pagination for the previous page, or null.
      */
-    public function previous(): ?OffsetPagination
+    public function previous(): ?Pagination
     {
-        return $this->navigator->previous();
+        return $this->paging->previous();
     }
 
     /**
@@ -211,13 +195,15 @@ final readonly class OffsetPage
      */
     public function toResponse(string $baseUri): ResponseInterface
     {
-        $links = Links::from(baseUri: $baseUri, criteria: $this->criteria, navigation: $this->navigation());
-
-        return Response::ok([
-            'data'  => $this->items->toArray(),
-            'meta'  => $this->metadata(),
-            'links' => $links->toArray()
-        ], $links->toHeader());
+        return Rendering::of(
+            sort: $this->sort,
+            self: $this->pagination,
+            items: $this->items,
+            filter: $this->filter,
+            baseUri: $baseUri,
+            metadata: $this->metadata(),
+            navigation: $this->navigation()
+        );
     }
 
     /**
@@ -237,7 +223,7 @@ final readonly class OffsetPage
      */
     public function currentPage(): int
     {
-        return $this->pageNumber->value();
+        return $this->paging->currentPage();
     }
 
     /**
@@ -247,6 +233,6 @@ final readonly class OffsetPage
      */
     public function hasPrevious(): bool
     {
-        return !$this->navigator->isFirst();
+        return $this->paging->hasPrevious();
     }
 }

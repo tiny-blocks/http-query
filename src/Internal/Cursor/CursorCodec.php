@@ -4,8 +4,6 @@ declare(strict_types=1);
 
 namespace TinyBlocks\HttpQuery\Internal\Cursor;
 
-use TinyBlocks\Encoder\Base62;
-use TinyBlocks\Encoder\Internal\Exceptions\InvalidDecoding;
 use TinyBlocks\HttpQuery\Exceptions\CursorIsInvalid;
 
 final class CursorCodec
@@ -16,13 +14,13 @@ final class CursorCodec
 
     public static function decode(string $token): array
     {
-        try {
-            $payload = Base62::from(value: $token)->decode();
-        } catch (InvalidDecoding $exception) {
-            throw CursorIsInvalid::from(token: $token, previous: $exception);
+        $decoded = base64_decode(strtr($token, '-_', '+/'), true);
+
+        if ($decoded === false) {
+            throw CursorIsInvalid::from(token: $token);
         }
 
-        $keys = json_decode($payload);
+        $keys = json_decode($decoded);
 
         if (!is_array($keys)) {
             throw CursorIsInvalid::from(token: $token);
@@ -35,6 +33,9 @@ final class CursorCodec
     {
         $payload = json_encode($keys, JSON_THROW_ON_ERROR);
 
-        return Base62::from(value: $payload)->encode();
+        return $payload
+                |> base64_encode(...)
+                |> (fn($x) => strtr($x, '+/', '-_'))
+                |> (fn($x) => rtrim($x, '='));
     }
 }

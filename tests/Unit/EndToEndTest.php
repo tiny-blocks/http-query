@@ -6,19 +6,23 @@ namespace Test\TinyBlocks\HttpQuery\Unit;
 
 use PHPUnit\Framework\TestCase;
 use Test\TinyBlocks\HttpQuery\Models\Query;
-use TinyBlocks\Collection\Collection;
-use TinyBlocks\Collection\KeyPreservation;
-use TinyBlocks\HttpQuery\Criteria;
-use TinyBlocks\HttpQuery\Cursor;
-use TinyBlocks\HttpQuery\Links;
-use TinyBlocks\HttpQuery\OffsetPage;
-use TinyBlocks\HttpQuery\OffsetPagination;
+use TinyBlocks\HttpQuery\Cursor\Criteria as CursorCriteria;
+use TinyBlocks\HttpQuery\Cursor\Token;
+use TinyBlocks\HttpQuery\Offset\Criteria as OffsetCriteria;
+use TinyBlocks\HttpQuery\Operator;
+use TinyBlocks\HttpQuery\Schema;
 
 final class EndToEndTest extends TestCase
 {
-    public function testPipelineWhenRequestGivenThenOffsetPageRendersResponse(): void
+    public function testPipelineWhenOffsetRequestGivenThenPageRendersTheResponse(): void
     {
-        /** @Given the canonical request query parameters */
+        /** @Given the query contract of the orders endpoint */
+        $schema = Schema::create()
+            ->sortable(fields: ['created_at', 'id'])
+            ->filterable(field: 'total', operators: [Operator::GREATER_THAN_OR_EQUAL])
+            ->filterable(field: 'status', operators: [Operator::EQUAL]);
+
+        /** @And the canonical request query parameters */
         $query = Query::from(parameters: [
             'filter' => 'status==paid;total=ge=100',
             'sort'   => '-created_at,id',
@@ -26,13 +30,13 @@ final class EndToEndTest extends TestCase
         ]);
 
         /** @And the criteria parsed from those parameters */
-        $criteria = Criteria::fromQuery(request: $query);
+        $criteria = OffsetCriteria::fromQuery(request: $query, schema: $schema);
 
         /** @And the base URI the navigation links render against */
         $base = '/v1/orders?filter=status==paid;total=ge=100&sort=-created_at,id';
 
         /** @And the third page of a 480-element result built from the criteria */
-        $page = $criteria->offsetPage(items: ['a', 'b'], total: 480);
+        $page = $criteria->page(total: 480, items: ['a', 'b']);
 
         /** @When rendering the page as a JSON:API response over the orders base URI */
         $response = $page->toResponse(baseUri: '/v1/orders');
@@ -58,45 +62,15 @@ final class EndToEndTest extends TestCase
         ], json_decode($response->getBody()->getContents(), true));
     }
 
-    public function testPipelineWhenCursorRequestGivenThenCursorPageRendersResponse(): void
+    public function testPipelineWhenOffsetRequestGivenThenLinkHeaderFoldsEveryRelation(): void
     {
-        /** @Given an opaque token produced from ordering key values */
-        $token = Cursor::fromKeys(keys: [5])->toString();
+        /** @Given the query contract of the orders endpoint */
+        $schema = Schema::create()
+            ->sortable(fields: ['created_at', 'id'])
+            ->filterable(field: 'total', operators: [Operator::GREATER_THAN_OR_EQUAL])
+            ->filterable(field: 'status', operators: [Operator::EQUAL]);
 
-        /** @And query parameters carrying a sort, that cursor, and a page size of two */
-        $query = Query::from(parameters: ['sort' => 'id', 'page' => ['cursor' => $token, 'size' => '2']]);
-
-        /** @And the criteria parsed from those parameters */
-        $criteria = Criteria::fromQuery(request: $query);
-
-        /** @And a cursor page built from the criteria over items fetched for the page size plus one */
-        $page = $criteria->cursorPage(items: [10, 20, 30], keysOf: static fn(mixed $element): array => [$element]);
-
-        /** @And the base URI the keyset links render against */
-        $base = '/v1/orders?sort=id';
-
-        /** @When rendering the cursor page as a JSON:API response over the orders base URI */
-        $response = $page->toResponse(baseUri: '/v1/orders');
-
-        /** @Then the body carries the data, the meta, and the keyset links preserving the sort */
-        self::assertSame([
-            'data'  => [10, 20],
-            'meta'  => [
-                'has_next'     => true,
-                'per_page'     => 2,
-                'has_previous' => true
-            ],
-            'links' => [
-                'self' => sprintf('%s&page[cursor]=%s&page[size]=2', $base, $token),
-                'prev' => sprintf('%s&page[cursor]=%s&page[size]=2', $base, Cursor::fromKeys(keys: [10])->toString()),
-                'next' => sprintf('%s&page[cursor]=%s&page[size]=2', $base, Cursor::fromKeys(keys: [20])->toString())
-            ]
-        ], json_decode($response->getBody()->getContents(), true));
-    }
-
-    public function testPipelineWhenCanonicalRequestGivenThenLinkHeaderFoldsEveryRelation(): void
-    {
-        /** @Given the canonical request query parameters */
+        /** @And the canonical request query parameters */
         $query = Query::from(parameters: [
             'filter' => 'status==paid;total=ge=100',
             'sort'   => '-created_at,id',
@@ -104,21 +78,7 @@ final class EndToEndTest extends TestCase
         ]);
 
         /** @And the criteria parsed from those parameters */
-        $criteria = Criteria::fromQuery(request: $query);
-
-        /** @And the offset pagination pointing at the third page */
-        $pagination = OffsetPagination::fromPage(page: 3, perPage: 20);
-
-        /** @And the third page of a 480-element result */
-        $page = OffsetPage::from(
-            items: Collection::createFromEmpty(),
-            total: 480,
-            criteria: $criteria,
-            pagination: $pagination
-        );
-
-        /** @And the navigation for that page over the orders base URI */
-        $links = Links::from(baseUri: '/v1/orders', criteria: $criteria, navigation: $page->navigation());
+        $criteria = OffsetCriteria::fromQuery(request: $query, schema: $schema);
 
         /** @And the base URI the relations render against */
         $base = '/v1/orders?filter=status==paid;total=ge=100&sort=-created_at,id';
@@ -126,8 +86,8 @@ final class EndToEndTest extends TestCase
         /** @And the Link header template rendered per relation */
         $template = '<%s&page[number]=%d&page[size]=20>; rel="%s"';
 
-        /** @When rendering the RFC 8288 Link header line */
-        $header = $links->toHeader()->toArray()['Link'][0];
+        /** @When rendering the page as a JSON:API response and reading its RFC 8288 Link header line */
+        $header = $criteria->page(total: 480, items: [])->toResponse(baseUri: '/v1/orders')->getHeaderLine('Link');
 
         /** @Then the line folds the five relations in navigation order */
         self::assertSame(implode(', ', [
@@ -139,60 +99,39 @@ final class EndToEndTest extends TestCase
         ]), $header);
     }
 
-    public function testPipelineWhenCanonicalRequestGivenThenJsonBodyCarriesDataMetaAndLinks(): void
+    public function testPipelineWhenCursorRequestGivenThenCursorPageRendersTheResponse(): void
     {
-        /** @Given the canonical request query parameters */
-        $query = Query::from(parameters: [
-            'filter' => 'status==paid;total=ge=100',
-            'sort'   => '-created_at,id',
-            'page'   => ['number' => '3', 'size' => '20']
-        ]);
+        /** @Given the query contract of the orders endpoint */
+        $schema = Schema::create()->sortable(fields: ['id']);
 
-        /** @And the criteria parsed from those parameters */
-        $criteria = Criteria::fromQuery(request: $query);
+        /** @And an opaque token produced from ordering key values */
+        $token = Token::fromKeys(keys: [5])->toString();
 
-        /** @And the offset pagination pointing at the third page */
-        $pagination = OffsetPagination::fromPage(page: 3, perPage: 20);
+        /** @And query parameters carrying a sort, that cursor, and a page size of two */
+        $query = Query::from(parameters: ['sort' => 'id', 'page' => ['cursor' => $token, 'size' => '2']]);
 
-        /** @And the third page of a 480-element result */
-        $page = OffsetPage::from(
-            items: Collection::createFromEmpty(),
-            total: 480,
-            criteria: $criteria,
-            pagination: $pagination
-        );
+        /** @And a cursor page built through the keyset view over the array rows fetched */
+        $page = CursorCriteria::fromQuery(request: $query, schema: $schema)
+            ->keyset()
+            ->page(items: [['id' => 10], ['id' => 20], ['id' => 30]]);
 
-        /** @And the navigation for that page over the orders base URI */
-        $links = Links::from(baseUri: '/v1/orders', criteria: $criteria, navigation: $page->navigation());
+        /** @And the base URI the keyset links render against */
+        $base = '/v1/orders?sort=id';
 
-        /** @And the base URI the navigation links render against */
-        $base = '/v1/orders?filter=status==paid;total=ge=100&sort=-created_at,id';
+        /** @When rendering the cursor page as a JSON:API response over the orders base URI */
+        $response = $page->toResponse(baseUri: '/v1/orders');
 
-        /** @When assembling the JSON:API body from the data, the meta, and the links */
-        $body = [
-            'data'  => $page->items()->toArray(keyPreservation: KeyPreservation::DISCARD),
-            'meta'  => $page->metadata(),
-            'links' => $links->toArray()
-        ];
-
-        /** @Then the body carries the empty data, the meta, and the five navigation links in order */
+        /** @Then the body carries the data, the meta, and the forward-only keyset links preserving the sort */
         self::assertSame([
-            'data'  => [],
+            'data'  => [['id' => 10], ['id' => 20]],
             'meta'  => [
-                'total'        => 480,
-                'has_next'     => true,
-                'per_page'     => 20,
-                'total_pages'  => 24,
-                'current_page' => 3,
-                'has_previous' => true
+                'has_next' => true,
+                'per_page' => 2
             ],
             'links' => [
-                'self'  => sprintf('%s&page[number]=3&page[size]=20', $base),
-                'first' => sprintf('%s&page[number]=1&page[size]=20', $base),
-                'prev'  => sprintf('%s&page[number]=2&page[size]=20', $base),
-                'next'  => sprintf('%s&page[number]=4&page[size]=20', $base),
-                'last'  => sprintf('%s&page[number]=24&page[size]=20', $base)
+                'self' => sprintf('%s&page[cursor]=%s&page[size]=2', $base, $token),
+                'next' => sprintf('%s&page[cursor]=%s&page[size]=2', $base, Token::fromKeys(keys: [20])->toString())
             ]
-        ], $body);
+        ], json_decode($response->getBody()->getContents(), true));
     }
 }

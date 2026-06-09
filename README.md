@@ -5,26 +5,31 @@
 * [Overview](#overview)
 * [Installation](#installation)
 * [How to use](#how-to-use)
+    + [Declaring the query contract](#declaring-the-query-contract)
     + [Filtering with RSQL](#filtering-with-rsql)
     + [Sorting](#sorting)
     + [Offset pagination](#offset-pagination)
     + [Cursor pagination](#cursor-pagination)
     + [Rendering navigation links](#rendering-navigation-links)
-    + [Configuring the schema](#configuring-the-schema)
 * [FAQ](#faq)
 * [License](#license)
 * [Contributing](#contributing)
 
 ## Overview
 
-A typed, framework- and database-agnostic toolkit for the query of an HTTP collection endpoint. It parses an incoming
-request query string into typed specifications for filtering (RSQL), sorting, and pagination (offset and cursor), and it
-renders the result as a JSON:API response carrying an RFC 8288 `Link` header and a body `links` object.
+A typed, framework- and database-agnostic toolkit for the query of an HTTP collection endpoint. The endpoint declares
+the query contract once on a `Schema`, the library parses an incoming request query string against it, and the consumer
+reads an already-validated result: a conjunction of comparisons for filtering, an effective sort, and a pagination view.
+The result renders as a JSON:API response carrying an RFC 8288 `Link` header and a body `links` object.
 
 The library never touches a data store. It turns the query string into value objects the consumer applies to its own
 store, and it renders the response the consumer returns. Every computation is O(1) value-object math over the inputs the
-consumer supplies. The pagination style stays internal: the `Criteria` builds the result page, so the public API never
-exposes a concrete pagination type.
+consumer supplies.
+
+The pagination approach is a fixed decision of the endpoint, not a runtime property of a request. The public API splits
+into two contexts, `Cursor` and `Offset`, each complete and approach-only, with the building blocks common to both at
+the root. Each page renders a `self` link consistent with its own approach, so a cursor page renders a cursor `self`
+and an offset page renders an offset `self`.
 
 ## Installation
 
@@ -34,9 +39,18 @@ composer require tiny-blocks/http-query
 
 ## How to use
 
-The entry point is `Criteria::fromQuery`, which reads the request query parameters from a PSR-7 request and produces a
-`Criteria` carrying the filter, the sort, and the pagination. The `Criteria` then builds the result page and renders it,
-so the pagination style stays internal.
+There are two entry points, one per pagination approach. `TinyBlocks\HttpQuery\Offset\Criteria` reads an offset request
+(`page[number]`, `page[size]`) and builds offset pages, while `TinyBlocks\HttpQuery\Cursor\Criteria` reads a keyset
+request (`page[cursor]`, `page[size]`) and builds forward-only cursor pages. Both read the same `filter` and `sort`
+parameters, validate them against the schema, and expose the same `comparisons()` and `sort()` building blocks.
+
+### Declaring the query contract
+
+`Schema` is the contract of the query an endpoint accepts. `filterable` declares a field with its permitted operators
+and, optionally, the permitted values and the `ValueKind` every value must match. `sortable` declares the fields the
+client may sort by. `defaultSort` declares the sort applied when the client sends none. `maxPerPage` and
+`defaultPerPage`
+bound the page size. The query parameter names follow JSON:API and are fixed: `filter`, `sort`, and the `page` family.
 
 ```php
 <?php
@@ -44,55 +58,88 @@ so the pagination style stays internal.
 declare(strict_types=1);
 
 use Psr\Http\Message\ServerRequestInterface;
-use TinyBlocks\HttpQuery\Criteria;
+use TinyBlocks\HttpQuery\Offset\Criteria;
+use TinyBlocks\HttpQuery\Operator;
+use TinyBlocks\HttpQuery\Schema;
+use TinyBlocks\HttpQuery\Sort;
+use TinyBlocks\HttpQuery\ValueKind;
+
+$schema = Schema::create()
+    ->maxPerPage(maxPerPage: 100)
+    ->sortable(fields: ['created_at', 'id'])
+    ->defaultSort(sort: Sort::fromExpression(expression: '-created_at'))
+    ->filterable(field: 'total', operators: [Operator::GREATER_THAN_OR_EQUAL], kind: ValueKind::INTEGER)
+    ->filterable(field: 'status', operators: [Operator::EQUAL, Operator::IN], values: ['paid', 'pending']);
 
 # GET /v1/orders?filter=status==paid;total=ge=100&sort=-created_at,id&page[number]=3&page[size]=20
 /** @var ServerRequestInterface $request */
-$criteria = Criteria::fromQuery(request: $request);
+$criteria = Criteria::fromQuery(request: $request, schema: $schema);
 ```
+
+When `Criteria::fromQuery` receives no schema, an empty contract applies: the default page-size bounds, no filterable
+or sortable field, and no default sort. Any incoming filter or sort is then rejected.
+
+| Setting          | Default | Meaning                                         |
+|------------------|---------|-------------------------------------------------|
+| `defaultPerPage` | `20`    | The page size applied when the query omits one. |
+| `maxPerPage`     | `100`   | The maximum allowed page size.                  |
+
+A page size above `maxPerPage` raises `PageSizeOutOfRange`.
 
 ### Filtering with RSQL
 
-The `filter` parameter is an RSQL expression. `Criteria::filtering()` returns the parsed expression tree as a `Filter`,
-which is either a `Comparison` leaf or a `Group` composite. The consumer matches on the node type to translate the tree
-to its own store.
+The `filter` parameter is an RSQL expression. It is validated against the schema at parse and flattened into the
+conjunction of comparisons the consumer applies to its store. `Criteria::comparisons()` returns that validated
+`list<Comparison>`, empty when there is no filter.
 
 ```php
 <?php
 
 declare(strict_types=1);
 
-use TinyBlocks\HttpQuery\Comparison;
-use TinyBlocks\HttpQuery\Filter;
-use TinyBlocks\HttpQuery\Group;
+use TinyBlocks\HttpQuery\Offset\Criteria;
+use TinyBlocks\HttpQuery\Operator;
 
-function describe(Filter $filter): string
-{
-    return match (true) {
-        $filter instanceof Comparison => sprintf(
-            '%s %s %s',
-            $filter->field(),
-            $filter->operator()->value,
-            implode(',', $filter->values())
-        ),
-        $filter instanceof Group => implode(
-            $filter->operator()->value,
-            array_map(describe(...), $filter->filters())
-        )
-    };
+# filter=status==paid;total=ge=100  ->  a validated list<Comparison>.
+/** @var Criteria $criteria */
+foreach ($criteria->comparisons() as $comparison) {
+    $comparison->field();                                 # 'status', then 'total'.
+    $comparison->values();                                # ['paid'], then ['100'].
+    $comparison->firstValue();                            # The first compared value, 'paid'.
+    $comparison->hasField(field: 'status');               # True for the status leaf.
+    $comparison->hasOperator(operator: Operator::EQUAL);  # True for an equality leaf.
 }
-
-# filter=status==paid;total=ge=100  parses to a Group(AND) of two Comparison leaves.
 ```
 
 The supported operators map to their RSQL tokens through the `Operator` enum (`==`, `!=`, `=lt=`, `=gt=`, `=le=`,
 `=ge=`, `=in=`, `=out=`). The logical connectives map through the `LogicalOperator` enum, where `;` (AND) binds tighter
-than `,` (OR), and parentheses group. A malformed expression raises `FilterExpressionIsInvalid`.
+than `,` (OR), and parentheses group. The library is conjunction-only for the consumer, so the filter must be a single
+comparison or an AND group of comparisons. A malformed expression raises `FilterExpressionIsInvalid`, and anything
+outside the contract raises a dedicated exception, each implementing `HttpQueryException`.
+
+| Exception                   | Raised when                                                             |
+|-----------------------------|-------------------------------------------------------------------------|
+| `FilterExpressionIsInvalid` | The filter expression cannot be parsed as RSQL.                         |
+| `FilterShapeNotSupported`   | The filter is an OR group, or nests a group, rather than a conjunction. |
+| `FilterFieldNotAllowed`     | A comparison targets a field that was never declared filterable.        |
+| `FilterOperatorNotAllowed`  | A comparison uses an operator not allowed for its field.                |
+| `FilterValueNotAllowed`     | A compared value falls outside the permitted set or the expected kind.  |
+
+`ValueKind` is the kind a value is validated against. For the multi-valued operators (`=in=`, `=out=`) every value is
+checked.
+
+| Kind                  | Matches                                                |
+|-----------------------|--------------------------------------------------------|
+| `ValueKind::STRING`   | A non-empty string.                                    |
+| `ValueKind::INTEGER`  | An optionally signed sequence of digits, `-7` or `42`. |
+| `ValueKind::DATETIME` | An ISO-8601 date or date-time, `2023-01-15T10:30:00Z`. |
 
 ### Sorting
 
 The `sort` parameter is a comma-separated list of fields, where a leading minus marks descending order, following the
-JSON:API convention. `Criteria::sorting()` returns a `Sort` whose `Order` list preserves the request order.
+JSON:API convention. `Criteria::sort()` returns the effective `Sort`: the client sort when present, validated so every
+field is declared `sortable`, otherwise the schema `defaultSort`. An order by an undeclared field raises
+`SortFieldNotAllowed`, and a malformed expression raises `SortExpressionIsInvalid`.
 
 ```php
 <?php
@@ -100,24 +147,21 @@ JSON:API convention. `Criteria::sorting()` returns a `Sort` whose `Order` list p
 declare(strict_types=1);
 
 use TinyBlocks\HttpQuery\Direction;
-use TinyBlocks\HttpQuery\Sort;
+use TinyBlocks\HttpQuery\Offset\Criteria;
 
-$sort = Sort::fromExpression(expression: '-created_at,id');
-
-foreach ($sort->orders() as $order) {
-    $order->field();                               # 'created_at' then 'id'
-    $order->direction() === Direction::DESCENDING; # true then false
+# sort=-created_at,id  ->  the effective Sort, ordered as requested.
+/** @var Criteria $criteria */
+foreach ($criteria->sort()->orders() as $order) {
+    $order->field();                               # 'created_at' then 'id'.
+    $order->direction() === Direction::DESCENDING; # true then false.
 }
 ```
 
-A malformed expression raises `SortExpressionIsInvalid`.
-
 ### Offset pagination
 
-When no cursor is present, `Criteria::offsetPage` builds an `OffsetPage` from the items of the current page and the
-total
-element count. The page derives the offset and the total pages from the request, so the consumer never builds the
-pagination itself. The items are any `iterable`, and `items()` returns them as a `Collection`.
+`Offset\Criteria::page` builds an `Offset\Page` from the total element count and the items of the current page. The page
+derives the offset and the total pages from the request, so the consumer never builds the pagination itself. The items
+are any `iterable`, and `items()` returns them as a `Collection`.
 
 ```php
 <?php
@@ -125,23 +169,23 @@ pagination itself. The items are any `iterable`, and `items()` returns them as a
 declare(strict_types=1);
 
 use Psr\Http\Message\ServerRequestInterface;
-use TinyBlocks\HttpQuery\Criteria;
+use TinyBlocks\HttpQuery\Offset\Criteria;
+use TinyBlocks\HttpQuery\Schema;
 
 # GET /v1/orders?page[number]=3&page[size]=20
 /** @var ServerRequestInterface $request */
-$criteria = Criteria::fromQuery(request: $request);
+$criteria = Criteria::fromQuery(request: $request, schema: Schema::create());
 
 /** @var iterable<mixed> $items */
-$page = $criteria->offsetPage(items: $items, total: 480);
+$page = $criteria->page(total: 480, items: $items);
 
 $page->hasNext();     # true
-$page->metadata();    # The JSON:API meta contents
+$page->metadata();    # The JSON:API meta contents.
 $page->totalPages();  # 24
 ```
 
-Use `Criteria::offsetSlice` instead of `Criteria::offsetPage` when the total is unknown. The consumer fetches one
-element
-beyond the page size, and the `OffsetSlice` trims it and reads its presence as the next-page hint.
+Use `Offset\Criteria::slice` instead of `page` when the total is unknown. The consumer fetches one element beyond the
+page size, and the `Offset\Slice` trims it and reads its presence as the next-page hint.
 
 ```php
 <?php
@@ -149,23 +193,26 @@ beyond the page size, and the `OffsetSlice` trims it and reads its presence as t
 declare(strict_types=1);
 
 use Psr\Http\Message\ServerRequestInterface;
-use TinyBlocks\HttpQuery\Criteria;
+use TinyBlocks\HttpQuery\Offset\Criteria;
+use TinyBlocks\HttpQuery\Schema;
 
 # GET /v1/orders?page[number]=2&page[size]=20
 /** @var ServerRequestInterface $request */
-$criteria = Criteria::fromQuery(request: $request);
+$criteria = Criteria::fromQuery(request: $request, schema: Schema::create());
 
 /** @var iterable<mixed> $items */
-$slice = $criteria->offsetSlice(items: $items);
+$slice = $criteria->slice(items: $items);
 
-$slice->hasNext(); # Inferred from the extra fetched element
+$slice->hasNext(); # Inferred from the extra fetched element.
 ```
 
 ### Cursor pagination
 
-When the `cursor` parameter is present, `Criteria::cursorPage` builds a keyset `CursorPage`. A `Cursor` is an opaque,
-URI-safe token wrapping the last-seen ordering key values, encoded through `tiny-blocks/encoder`. The `keysOf` closure
-extracts the ordering key values from an element, and the page derives the forward and backward cursors from them.
+Cursor pages are forward-only. `Cursor\Criteria::keyset` pairs the effective sort with the cursor view, exposing the
+seek inputs the consumer needs before fetching: the page size, the orders, and the incoming cursor key values keyed by
+sort field. A keyset needs a deterministic order, so the schema must declare a `defaultSort` or the client must sort,
+otherwise `keyset` raises `SortIsRequired`. A `Token` is an opaque, URI-safe value wrapping the last-seen ordering key
+values, encoded as URL-safe base64.
 
 ```php
 <?php
@@ -173,21 +220,45 @@ extracts the ordering key values from an element, and the page derives the forwa
 declare(strict_types=1);
 
 use Psr\Http\Message\ServerRequestInterface;
-use TinyBlocks\HttpQuery\Criteria;
+use TinyBlocks\HttpQuery\Cursor\Criteria;
+use TinyBlocks\HttpQuery\Schema;
+
+$schema = Schema::create()->sortable(fields: ['created_at', 'id']);
 
 # GET /v1/orders?sort=-created_at,id&page[cursor]=BS3RvKY4LqEjYD19mQ0mCpJ&page[size]=20
 /** @var ServerRequestInterface $request */
-$criteria = Criteria::fromQuery(request: $request);
+$keyset = Criteria::fromQuery(request: $request, schema: $schema)->keyset();
 
+$keyset->limit();   # The page size, 20.
+$keyset->orders();  # The list<Order> the seek is ordered by.
+$keyset->cursor();  # ['created_at' => ..., 'id' => ...], null per field on the first page.
+```
+
+The seek inputs feed the store query. The consumer fetches one element beyond the page size and hands the rows to
+`page`, which trims the extra element and reads its presence as the next-page hint. The ordering keys default to the
+sort fields read from each array-shaped row, so the cursor keys come from the source rows. Pass an explicit `keysOf` to
+extract them differently.
+
+```php
+<?php
+
+declare(strict_types=1);
+
+use TinyBlocks\HttpQuery\Cursor\Keyset;
+
+/** @var Keyset $keyset */
 /** @var iterable<array{id: int, created_at: string}> $items */
-$cursorPage = $criteria->cursorPage(
-    items: $items,
-    keysOf: static fn(array $order): array => [$order['created_at'], $order['id']]
-);
+$cursorPage = $keyset->page(items: $items);
 
-$cursorPage->next();     # The CursorPagination for the next page, or null.
-$cursorPage->hasNext();  # Inferred from the extra fetched element.
-$cursorPage->previous(); # The CursorPagination for the previous page, or null.
+$cursorPage->next();    # The Cursor\Pagination for the next page, or null.
+$cursorPage->hasNext(); # Inferred from the extra fetched element.
+```
+
+`map` projects the items for rendering while preserving the cursor, so raw rows drive the ordering keys and a view is
+rendered from the same page.
+
+```php
+$cursorPage->map(transformation: static fn(array $row): array => ['id' => $row['id']]);
 ```
 
 An invalid cursor token raises `CursorIsInvalid` when it is decoded.
@@ -196,6 +267,8 @@ An invalid cursor token raises `CursorIsInvalid` when it is decoded.
 
 `toResponse` renders a result as a JSON:API response in one call. It builds the body from the data, the meta, and the
 navigation links, and folds the same relations into an RFC 8288 `Link` header. It returns a PSR-7 `ResponseInterface`.
+The submitted filter and sort are preserved in every URI, and the `self` link is built from the page's own current
+pagination, so an offset page renders an offset `self` and a cursor page renders a cursor `self`.
 
 ```php
 <?php
@@ -203,44 +276,17 @@ navigation links, and folds the same relations into an RFC 8288 `Link` header. I
 declare(strict_types=1);
 
 use Psr\Http\Message\ServerRequestInterface;
-use TinyBlocks\HttpQuery\Criteria;
+use TinyBlocks\HttpQuery\Offset\Criteria;
+use TinyBlocks\HttpQuery\Schema;
 
-# GET /v1/orders?filter=status==paid;total=ge=100&sort=-created_at,id&page[number]=3&page[size]=20
+$schema = Schema::create()->sortable(fields: ['created_at', 'id']);
+
+# GET /v1/orders?filter=status==paid&sort=-created_at,id&page[number]=3&page[size]=20
 /** @var ServerRequestInterface $request */
-$criteria = Criteria::fromQuery(request: $request);
+$criteria = Criteria::fromQuery(request: $request, schema: $schema);
 
 /** @var iterable<mixed> $items */
-$response = $criteria->offsetPage(items: $items, total: 480)->toResponse(baseUri: '/v1/orders');
-```
-
-For full control over the body, assemble it from the parts. `Links::from` reads the navigation a result exposes through
-`result->navigation()` and builds each URI from the criteria's filter and sort plus the pagination of every target, so
-the filter and the sort are preserved in every URI. `toArray()` returns the JSON:API body `links` object and
-`toHeader()` returns an RFC 8288 `Link`.
-
-```php
-<?php
-
-declare(strict_types=1);
-
-use Psr\Http\Message\ServerRequestInterface;
-use TinyBlocks\Http\Server\Response;
-use TinyBlocks\HttpQuery\Criteria;
-use TinyBlocks\HttpQuery\Links;
-
-# GET /v1/orders?filter=status==paid;total=ge=100&sort=-created_at,id&page[number]=3&page[size]=20
-/** @var ServerRequestInterface $request */
-$criteria = Criteria::fromQuery(request: $request);
-
-/** @var iterable<mixed> $items */
-$page = $criteria->offsetPage(items: $items, total: 480);
-$links = Links::from(baseUri: '/v1/orders', criteria: $criteria, navigation: $page->navigation());
-
-$response = Response::ok([
-    'data'  => $page->items()->toArray(),
-    'meta'  => $page->metadata(),
-    'links' => $links->toArray()
-], $links->toHeader());
+$response = $criteria->page(total: 480, items: $items)->toResponse(baseUri: '/v1/orders');
 ```
 
 The body carries the navigation with the filter and the sort preserved in every URI.
@@ -257,11 +303,11 @@ The body carries the navigation with the filter and the sort preserved in every 
         "has_previous": true
     },
     "links": {
-        "self": "/v1/orders?filter=status==paid;total=ge=100&sort=-created_at,id&page[number]=3&page[size]=20",
-        "first": "/v1/orders?filter=status==paid;total=ge=100&sort=-created_at,id&page[number]=1&page[size]=20",
-        "prev": "/v1/orders?filter=status==paid;total=ge=100&sort=-created_at,id&page[number]=2&page[size]=20",
-        "next": "/v1/orders?filter=status==paid;total=ge=100&sort=-created_at,id&page[number]=4&page[size]=20",
-        "last": "/v1/orders?filter=status==paid;total=ge=100&sort=-created_at,id&page[number]=24&page[size]=20"
+        "self": "/v1/orders?filter=status==paid&sort=-created_at,id&page[number]=3&page[size]=20",
+        "first": "/v1/orders?filter=status==paid&sort=-created_at,id&page[number]=1&page[size]=20",
+        "prev": "/v1/orders?filter=status==paid&sort=-created_at,id&page[number]=2&page[size]=20",
+        "next": "/v1/orders?filter=status==paid&sort=-created_at,id&page[number]=4&page[size]=20",
+        "last": "/v1/orders?filter=status==paid&sort=-created_at,id&page[number]=24&page[size]=20"
     }
 }
 ```
@@ -269,16 +315,16 @@ The body carries the navigation with the filter and the sort preserved in every 
 The header folds the same relations into one RFC 8288 `Link` line.
 
 ```text
-Link: </v1/orders?filter=status==paid;total=ge=100&sort=-created_at,id&page[number]=3&page[size]=20>; rel="self",
-      </v1/orders?filter=status==paid;total=ge=100&sort=-created_at,id&page[number]=1&page[size]=20>; rel="first",
-      </v1/orders?filter=status==paid;total=ge=100&sort=-created_at,id&page[number]=2&page[size]=20>; rel="prev",
-      </v1/orders?filter=status==paid;total=ge=100&sort=-created_at,id&page[number]=4&page[size]=20>; rel="next",
-      </v1/orders?filter=status==paid;total=ge=100&sort=-created_at,id&page[number]=24&page[size]=20>; rel="last"
+Link: </v1/orders?filter=status==paid&sort=-created_at,id&page[number]=3&page[size]=20>; rel="self",
+      </v1/orders?filter=status==paid&sort=-created_at,id&page[number]=1&page[size]=20>; rel="first",
+      </v1/orders?filter=status==paid&sort=-created_at,id&page[number]=2&page[size]=20>; rel="prev",
+      </v1/orders?filter=status==paid&sort=-created_at,id&page[number]=4&page[size]=20>; rel="next",
+      </v1/orders?filter=status==paid&sort=-created_at,id&page[number]=24&page[size]=20>; rel="last"
 ```
 
 The `links` keys are the canonical JSON:API relations, in the semantic order below. Unavailable relations are omitted,
-so the first page carries no `prev` and the last page carries no `next`. An `OffsetSlice` exposes `self`, `first`,
-`prev`, and `next` (no `last`), and a `CursorPage` exposes only `self`, `prev`, and `next`.
+so the first page carries no `prev` and the last page carries no `next`. An `Offset\Slice` exposes `self`, `first`,
+`prev`, and `next` (no `last`), and a `Cursor\Page` is forward-only, so it exposes only `self` and `next`.
 
 | Relation | Meaning            |
 |----------|--------------------|
@@ -287,37 +333,6 @@ so the first page carries no `prev` and the last page carries no `next`. An `Off
 | `prev`   | The previous page. |
 | `next`   | The next page.     |
 | `last`   | The last page.     |
-
-### Configuring the schema
-
-The query parameter names follow JSON:API and are fixed: `filter`, `sort`, and the `page` family (`page[number]`,
-`page[size]`, `page[cursor]`). `Schema` carries only the page-size bounds. `Schema::default()` is applied when
-`Criteria::fromQuery` receives no schema, and the fluent `with*` copies override either bound.
-
-| Setting          | Default | Meaning                                         |
-|------------------|---------|-------------------------------------------------|
-| `defaultPerPage` | `20`    | The page size applied when the query omits one. |
-| `maxPerPage`     | `100`   | The maximum allowed page size.                  |
-
-```php
-<?php
-
-declare(strict_types=1);
-
-use Psr\Http\Message\ServerRequestInterface;
-use TinyBlocks\HttpQuery\Criteria;
-use TinyBlocks\HttpQuery\Schema;
-
-$schema = Schema::default()
-    ->withMaxPerPage(maxPerPage: 200)
-    ->withDefaultPerPage(defaultPerPage: 50);
-
-# GET /v1/orders?filter=status==paid&page[size]=50
-/** @var ServerRequestInterface $request */
-$criteria = Criteria::fromQuery(request: $request, schema: $schema);
-```
-
-A page size above `maxPerPage` raises `PageSizeOutOfRange`.
 
 ## FAQ
 
@@ -328,20 +343,29 @@ half. It parses the request into typed specifications and renders the response n
 apply the specifications to any store, SQL, a document database, or an in-memory list. Keeping the store out makes every
 operation pure value-object math and keeps the library framework- and database-agnostic.
 
-### 02. Why RSQL for filtering instead of ad-hoc query parameters?
+### 02. Why is the query validated at parse instead of by the consumer?
+
+A filter or a sort enters the system at parse, so that is where it is validated. The endpoint declares the contract once
+on the `Schema`, and `Criteria::fromQuery` returns an already-validated result. The consumer reads `comparisons()` and
+`sort()` without flattening a tree, enforcing an allowlist, or rendering an expression. A request outside the contract
+fails at the boundary with a dedicated `HttpQueryException`, never reaching the store.
+
+### 03. Why RSQL for filtering instead of ad-hoc query parameters?
 
 RSQL is a small, URI-safe grammar with a published reference, so the filter survives a query string without encoding and
-the same expression reads the same on the client and the server. The parser produces an immutable expression tree the
-consumer walks, rather than a flat map of parameters that cannot express grouping or disjunction.
+the same expression reads the same on the client and the server. The library is conjunction-only for the consumer: a
+single comparison or an AND group of comparisons flattens into the `list<Comparison>` the consumer applies,
+`AND` an `OR` or nested filter is rejected at parse.
 
 > Zdenek Jirutka, *RSQL / FIQL parser* (https://github.com/jirutka/rsql-parser).
 
-### 03. Why are both offset and cursor pagination supported?
+### 04. Why are the two pagination approaches split into separate contexts?
 
-Offset pagination answers "how many pages are there" and "jump to page N", which an `OffsetPage` with a total provides.
-Cursor pagination answers "give me the next slice after this point" without a total, which scales to large collections
-and avoids the drift of offset pagination under concurrent writes. The library models both, plus an `OffsetSlice` for
-offset navigation without a total.
+The pagination approach is a fixed decision of the endpoint, not a runtime property of a request. A single specification
+that infers the approach at runtime renders an inconsistent `self` link: the first page of a cursor feed would carry an
+offset-style `self` while its `next` is cursor-style. Splitting the API into a `Cursor` context and an `Offset` context,
+each complete and approach-only, with the common building blocks at the root, makes every `self` link consistent with
+the page's own approach.
 
 ## License
 

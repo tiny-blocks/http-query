@@ -7,8 +7,9 @@ namespace TinyBlocks\HttpQuery;
 /**
  * Pagination request that knows its page size and how to serialize itself into a query string.
  *
- * <p>It is implemented by the offset-based {@see OffsetPagination} and the keyset {@see CursorPagination},
- * so a {@see Criteria} carries either one without branching on the concrete type.</p>
+ * <p>It is implemented by the offset-based {@see Offset\Pagination} and the
+ * keyset {@see Cursor\Pagination}, so {@see Links} renders a page over either
+ * approach without branching on the concrete type.</p>
  */
 interface Pagination
 {

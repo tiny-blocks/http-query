@@ -8,306 +8,303 @@ use PHPUnit\Framework\Attributes\DataProvider;
 use PHPUnit\Framework\TestCase;
 use Test\TinyBlocks\HttpQuery\Models\Query;
 use TinyBlocks\HttpQuery\Comparison;
-use TinyBlocks\HttpQuery\Criteria;
 use TinyBlocks\HttpQuery\Exceptions\FilterExpressionIsInvalid;
-use TinyBlocks\HttpQuery\Group;
-use TinyBlocks\HttpQuery\LogicalOperator;
+use TinyBlocks\HttpQuery\Exceptions\FilterFieldNotAllowed;
+use TinyBlocks\HttpQuery\Exceptions\FilterOperatorNotAllowed;
+use TinyBlocks\HttpQuery\Exceptions\FilterShapeNotSupported;
+use TinyBlocks\HttpQuery\Exceptions\FilterValueNotAllowed;
+use TinyBlocks\HttpQuery\Offset\Criteria;
 use TinyBlocks\HttpQuery\Operator;
+use TinyBlocks\HttpQuery\Schema;
+use TinyBlocks\HttpQuery\ValueKind;
 
 final class FilterTest extends TestCase
 {
-    public function testIsEmptyWhenGroupHasNoChildThenIsEmpty(): void
+    private Schema $schema;
+
+    protected function setUp(): void
     {
-        /** @Given an empty group */
-        $group = Group::none();
-
-        /** @When checking whether it is empty */
-        $isEmpty = $group->isEmpty();
-
-        /** @Then it reports itself as empty */
-        self::assertTrue($isEmpty);
+        $this->schema = Schema::create()
+            ->filterable(field: 'a', operators: Operator::cases())
+            ->filterable(field: 'b', operators: Operator::cases())
+            ->filterable(field: 'c', operators: Operator::cases())
+            ->filterable(field: 'role', operators: Operator::cases())
+            ->filterable(field: 'name', operators: Operator::cases())
+            ->filterable(field: 'status', operators: Operator::cases());
     }
 
-    public function testIsEmptyWhenGroupHasChildThenIsNotEmpty(): void
-    {
-        /** @Given a group joining a single comparison */
-        $group = Group::of(filters: [
-            Comparison::of(field: 'a', values: ['1'], operator: Operator::EQUAL)
-        ], operator: LogicalOperator::AND);
-
-        /** @When checking whether it is empty */
-        $isEmpty = $group->isEmpty();
-
-        /** @Then it reports itself as not empty */
-        self::assertFalse($isEmpty);
-    }
-
-    public function testIsEmptyWhenComparisonGivenThenIsNotEmpty(): void
-    {
-        /** @Given an equality comparison */
-        $comparison = Comparison::of(field: 'status', values: ['paid'], operator: Operator::EQUAL);
-
-        /** @When checking whether it is empty */
-        $isEmpty = $comparison->isEmpty();
-
-        /** @Then it reports itself as not empty */
-        self::assertFalse($isEmpty);
-    }
-
-    public function testFilteringWhenNoFilterGivenThenReturnsEmptyGroup(): void
+    public function testFromQueryWhenNoFilterThenComparisonsAreEmpty(): void
     {
         /** @Given a query carrying no filter parameter at all */
         $query = Query::from(parameters: []);
 
-        /** @When reading the filtering specification */
-        $filter = Criteria::fromQuery(request: $query)->filtering();
+        /** @When reading the validated comparisons */
+        $comparisons = Criteria::fromQuery(request: $query, schema: $this->schema)->comparisons();
 
-        /** @Then the filter is an empty group joined by the AND connective */
-        self::assertEquals(Group::of(filters: [], operator: LogicalOperator::AND), $filter);
+        /** @Then there is no comparison */
+        self::assertSame([], $comparisons);
     }
 
-    public function testFilteringWhenOrGivenThenGroupJoinsTwoComparisons(): void
-    {
-        /** @Given a query carrying an OR expression of two comparisons */
-        $query = Query::from(parameters: ['filter' => 'a==1,b==2']);
-
-        /** @When reading the filtering specification */
-        $filter = Criteria::fromQuery(request: $query)->filtering();
-
-        /** @Then the filter is an OR group joining the two comparison children in order */
-        self::assertEquals(Group::of(filters: [
-            Comparison::of(field: 'a', values: ['1'], operator: Operator::EQUAL),
-            Comparison::of(field: 'b', values: ['2'], operator: Operator::EQUAL)
-        ], operator: LogicalOperator::OR), $filter);
-    }
-
-    public function testFilteringWhenAndGivenThenGroupJoinsTwoComparisons(): void
-    {
-        /** @Given a query carrying an AND expression of two comparisons */
-        $query = Query::from(parameters: ['filter' => 'a==1;b==2']);
-
-        /** @When reading the filtering specification */
-        $filter = Criteria::fromQuery(request: $query)->filtering();
-
-        /** @Then the filter is an AND group joining the two comparison children in order */
-        self::assertEquals(Group::of(filters: [
-            Comparison::of(field: 'a', values: ['1'], operator: Operator::EQUAL),
-            Comparison::of(field: 'b', values: ['2'], operator: Operator::EQUAL)
-        ], operator: LogicalOperator::AND), $filter);
-    }
-
-    public function testFilteringWhenInListGivenThenComparisonCarriesEveryValue(): void
-    {
-        /** @Given a query carrying an IN list comparison */
-        $query = Query::from(parameters: ['filter' => 'role=in=(admin,user)']);
-
-        /** @When reading the filtering specification */
-        $filter = Criteria::fromQuery(request: $query)->filtering();
-
-        /** @Then the filter is an IN comparison carrying every listed value in order */
-        self::assertEquals(Comparison::of(field: 'role', values: ['admin', 'user'], operator: Operator::IN), $filter);
-    }
-
-    public function testToExpressionWhenAndGroupNestedInOrThenLeavesItUnwrapped(): void
-    {
-        /** @Given an OR group whose first child is an AND group */
-        $group = Group::of(filters: [
-            Group::of(filters: [
-                Comparison::of(field: 'a', values: ['1'], operator: Operator::EQUAL),
-                Comparison::of(field: 'b', values: ['2'], operator: Operator::EQUAL)
-            ], operator: LogicalOperator::AND),
-            Comparison::of(field: 'c', values: ['3'], operator: Operator::EQUAL)
-        ], operator: LogicalOperator::OR);
-
-        /** @When rendering it as an RSQL expression */
-        $expression = $group->toExpression()->value();
-
-        /** @Then the tighter-binding AND group is left unwrapped */
-        self::assertSame('a==1;b==2,c==3', $expression);
-    }
-
-    public function testToExpressionWhenInListGivenThenWrapsValuesInParentheses(): void
-    {
-        /** @Given an IN comparison carrying several values */
-        $comparison = Comparison::of(field: 'role', values: ['admin', 'user'], operator: Operator::IN);
-
-        /** @When rendering it as an RSQL expression */
-        $expression = $comparison->toExpression()->value();
-
-        /** @Then it wraps the comma-joined values in parentheses */
-        self::assertSame('role=in=(admin,user)', $expression);
-    }
-
-    public function testToExpressionWhenValueCarriesReservedCharacterThenQuotesIt(): void
-    {
-        /** @Given a comparison whose value carries a space */
-        $comparison = Comparison::of(field: 'name', values: ['John Doe'], operator: Operator::EQUAL);
-
-        /** @When rendering it as an RSQL expression */
-        $expression = $comparison->toExpression()->value();
-
-        /** @Then it renders the value within double quotes */
-        self::assertSame('name=="John Doe"', $expression);
-    }
-
-    public function testToExpressionWhenValueCarriesQuoteAndBackslashThenEscapesBoth(): void
-    {
-        /** @Given a comparison whose value carries a double quote and a backslash */
-        $comparison = Comparison::of(field: 'name', values: ['a"b\\c'], operator: Operator::EQUAL);
-
-        /** @When rendering it as an RSQL expression */
-        $expression = $comparison->toExpression()->value();
-
-        /** @Then the quote and the backslash are escaped within the double-quoted value */
-        self::assertSame('name=="a\\"b\\\\c"', $expression);
-    }
-
-    public function testFilteringWhenMixedPrecedenceGivenThenAndBindsTighterThanOr(): void
-    {
-        /** @Given a query mixing AND and OR connectives without explicit grouping */
-        $query = Query::from(parameters: ['filter' => 'a==1;b==2,c==3']);
-
-        /** @When reading the filtering specification */
-        $filter = Criteria::fromQuery(request: $query)->filtering();
-
-        /** @Then the top filter is an OR group whose first child is the tighter AND group */
-        self::assertEquals(Group::of(filters: [
-            Group::of(filters: [
-                Comparison::of(field: 'a', values: ['1'], operator: Operator::EQUAL),
-                Comparison::of(field: 'b', values: ['2'], operator: Operator::EQUAL)
-            ], operator: LogicalOperator::AND),
-            Comparison::of(field: 'c', values: ['3'], operator: Operator::EQUAL)
-        ], operator: LogicalOperator::OR), $filter);
-    }
-
-    public function testFilteringWhenNotInListGivenThenComparisonCarriesEveryValue(): void
-    {
-        /** @Given a query carrying a NOT_IN list comparison */
-        $query = Query::from(parameters: ['filter' => 'role=out=(a,b)']);
-
-        /** @When reading the filtering specification */
-        $filter = Criteria::fromQuery(request: $query)->filtering();
-
-        /** @Then the filter is a NOT_IN comparison carrying every listed value in order */
-        self::assertEquals(Comparison::of(field: 'role', values: ['a', 'b'], operator: Operator::NOT_IN), $filter);
-    }
-
-    public function testToExpressionWhenAndGroupGivenThenJoinsChildrenWithAndToken(): void
-    {
-        /** @Given an AND group of two comparisons */
-        $group = Group::of(filters: [
-            Comparison::of(field: 'a', values: ['1'], operator: Operator::EQUAL),
-            Comparison::of(field: 'b', values: ['2'], operator: Operator::EQUAL)
-        ], operator: LogicalOperator::AND);
-
-        /** @When rendering it as an RSQL expression */
-        $expression = $group->toExpression()->value();
-
-        /** @Then it joins the children with the AND token */
-        self::assertSame('a==1;b==2', $expression);
-    }
-
-    public function testToExpressionWhenOrGroupNestedInAndThenWrapsItInParentheses(): void
-    {
-        /** @Given an AND group whose first child is an OR group */
-        $group = Group::of(filters: [
-            Group::of(filters: [
-                Comparison::of(field: 'a', values: ['1'], operator: Operator::EQUAL),
-                Comparison::of(field: 'b', values: ['2'], operator: Operator::EQUAL)
-            ], operator: LogicalOperator::OR),
-            Comparison::of(field: 'c', values: ['3'], operator: Operator::EQUAL)
-        ], operator: LogicalOperator::AND);
-
-        /** @When rendering it as an RSQL expression */
-        $expression = $group->toExpression()->value();
-
-        /** @Then the nested OR group is wrapped in parentheses */
-        self::assertSame('(a==1,b==2);c==3', $expression);
-    }
-
-    public function testFilteringWhenDoubleQuotedValueGivenThenComparisonStripsQuotes(): void
-    {
-        /** @Given a query carrying a double-quoted value with whitespace */
-        $query = Query::from(parameters: ['filter' => 'name=="John Doe"']);
-
-        /** @When reading the filtering specification */
-        $filter = Criteria::fromQuery(request: $query)->filtering();
-
-        /** @Then the comparison carries the value with the surrounding quotes stripped */
-        self::assertEquals(Comparison::of(field: 'name', values: ['John Doe'], operator: Operator::EQUAL), $filter);
-    }
-
-    public function testFilteringWhenSingleQuotedValueGivenThenComparisonStripsQuotes(): void
-    {
-        /** @Given a query carrying a single-quoted value with whitespace */
-        $query = Query::from(parameters: ['filter' => "name=='John Doe'"]);
-
-        /** @When reading the filtering specification */
-        $filter = Criteria::fromQuery(request: $query)->filtering();
-
-        /** @Then the comparison carries the value with the surrounding quotes stripped */
-        self::assertEquals(Comparison::of(field: 'name', values: ['John Doe'], operator: Operator::EQUAL), $filter);
-    }
-
-    public function testToExpressionWhenComparisonGivenThenRendersFieldOperatorAndValue(): void
-    {
-        /** @Given an equality comparison on a field */
-        $comparison = Comparison::of(field: 'status', values: ['paid'], operator: Operator::EQUAL);
-
-        /** @When rendering it as an RSQL expression */
-        $expression = $comparison->toExpression()->value();
-
-        /** @Then it renders the field, the operator token, and the value */
-        self::assertSame('status==paid', $expression);
-    }
-
-    public function testFilteringWhenExplicitGroupingGivenThenParenthesesOverridePrecedence(): void
-    {
-        /** @Given a query whose parentheses force the OR group to bind first */
-        $query = Query::from(parameters: ['filter' => '(a==1,b==2);c==3']);
-
-        /** @When reading the filtering specification */
-        $filter = Criteria::fromQuery(request: $query)->filtering();
-
-        /** @Then the top filter is an AND group whose first child is the parenthesized OR group */
-        self::assertEquals(Group::of(filters: [
-            Group::of(filters: [
-                Comparison::of(field: 'a', values: ['1'], operator: Operator::EQUAL),
-                Comparison::of(field: 'b', values: ['2'], operator: Operator::EQUAL)
-            ], operator: LogicalOperator::OR),
-            Comparison::of(field: 'c', values: ['3'], operator: Operator::EQUAL)
-        ], operator: LogicalOperator::AND), $filter);
-    }
-
-    public function testFilteringWhenSingleComparisonGivenThenComparisonCarriesFieldAndValue(): void
+    public function testFromQueryWhenSingleComparisonThenComparisonCarriesFieldAndValue(): void
     {
         /** @Given a query carrying a single equality comparison */
         $query = Query::from(parameters: ['filter' => 'status==paid']);
 
-        /** @When reading the filtering specification */
-        $filter = Criteria::fromQuery(request: $query)->filtering();
+        /** @When reading the validated comparisons */
+        $comparisons = Criteria::fromQuery(request: $query, schema: $this->schema)->comparisons();
 
-        /** @Then the filter is an equality comparison on the named field with its value */
-        self::assertEquals(Comparison::of(field: 'status', values: ['paid'], operator: Operator::EQUAL), $filter);
+        /** @Then the only comparison is an equality on the named field with its value */
+        self::assertEquals(
+            [Comparison::of(field: 'status', values: ['paid'], operator: Operator::EQUAL)],
+            $comparisons
+        );
+    }
+
+    public function testFromQueryWhenAndGroupThenComparisonsCarryEveryLeaf(): void
+    {
+        /** @Given a query carrying an AND expression of two comparisons */
+        $query = Query::from(parameters: ['filter' => 'a==1;b==2']);
+
+        /** @When reading the validated comparisons */
+        $comparisons = Criteria::fromQuery(request: $query, schema: $this->schema)->comparisons();
+
+        /** @Then the comparisons carry both leaves in order */
+        self::assertEquals([
+            Comparison::of(field: 'a', values: ['1'], operator: Operator::EQUAL),
+            Comparison::of(field: 'b', values: ['2'], operator: Operator::EQUAL)
+        ], $comparisons);
+    }
+
+    public function testFromQueryWhenInListThenComparisonCarriesEveryValue(): void
+    {
+        /** @Given a query carrying an IN list comparison */
+        $query = Query::from(parameters: ['filter' => 'role=in=(admin,user)']);
+
+        /** @When reading the validated comparisons */
+        $comparisons = Criteria::fromQuery(request: $query, schema: $this->schema)->comparisons();
+
+        /** @Then the only comparison is an IN comparison carrying every listed value in order */
+        self::assertEquals(
+            [Comparison::of(field: 'role', values: ['admin', 'user'], operator: Operator::IN)],
+            $comparisons
+        );
+    }
+
+    public function testFromQueryWhenNotInListThenComparisonCarriesEveryValue(): void
+    {
+        /** @Given a query carrying a NOT_IN list comparison */
+        $query = Query::from(parameters: ['filter' => 'role=out=(a,b)']);
+
+        /** @When reading the validated comparisons */
+        $comparisons = Criteria::fromQuery(request: $query, schema: $this->schema)->comparisons();
+
+        /** @Then the only comparison is a NOT_IN comparison carrying every listed value in order */
+        self::assertEquals(
+            [Comparison::of(field: 'role', values: ['a', 'b'], operator: Operator::NOT_IN)],
+            $comparisons
+        );
+    }
+
+    public function testFromQueryWhenDoubleQuotedValueThenComparisonStripsQuotes(): void
+    {
+        /** @Given a query carrying a double-quoted value with whitespace */
+        $query = Query::from(parameters: ['filter' => 'name=="John Doe"']);
+
+        /** @When reading the validated comparisons */
+        $comparisons = Criteria::fromQuery(request: $query, schema: $this->schema)->comparisons();
+
+        /** @Then the comparison carries the value with the surrounding quotes stripped */
+        self::assertEquals(
+            [Comparison::of(field: 'name', values: ['John Doe'], operator: Operator::EQUAL)],
+            $comparisons
+        );
+    }
+
+    public function testFromQueryWhenSingleQuotedValueThenComparisonStripsQuotes(): void
+    {
+        /** @Given a query carrying a single-quoted value with whitespace */
+        $query = Query::from(parameters: ['filter' => "name=='John Doe'"]);
+
+        /** @When reading the validated comparisons */
+        $comparisons = Criteria::fromQuery(request: $query, schema: $this->schema)->comparisons();
+
+        /** @Then the comparison carries the value with the surrounding quotes stripped */
+        self::assertEquals(
+            [Comparison::of(field: 'name', values: ['John Doe'], operator: Operator::EQUAL)],
+            $comparisons
+        );
+    }
+
+    public function testFromQueryWhenDateTimeValueMatchesKindThenComparisonIsReturned(): void
+    {
+        /** @Given a schema allowing a date-time field under the greater-than operator */
+        $schema = Schema::create()->filterable(
+            field: 'created_at',
+            operators: [Operator::GREATER_THAN],
+            kind: ValueKind::DATETIME
+        );
+
+        /** @And a query carrying a valid date-time value */
+        $query = Query::from(parameters: ['filter' => 'created_at=gt=2023-01-15T10:30:00Z']);
+
+        /** @When reading the validated comparisons */
+        $comparisons = Criteria::fromQuery(request: $query, schema: $schema)->comparisons();
+
+        /** @Then the only comparison carries the date-time value */
+        self::assertEquals([Comparison::of(
+            field: 'created_at',
+            values: ['2023-01-15T10:30:00Z'],
+            operator: Operator::GREATER_THAN
+        )], $comparisons);
+    }
+
+    public function testFromQueryWhenOrGroupThenThrowsFilterShapeNotSupported(): void
+    {
+        /** @Given a query carrying an OR expression of two comparisons */
+        $query = Query::from(parameters: ['filter' => 'a==1,b==2']);
+
+        /** @Then an exception carrying the raw filter query string is raised */
+        $this->expectException(FilterShapeNotSupported::class);
+        $this->expectExceptionMessage('Filter shape <a==1,b==2> is not supported.');
+
+        /** @When building the criteria from the query */
+        Criteria::fromQuery(request: $query, schema: $this->schema);
+    }
+
+    public function testFromQueryWhenMixedPrecedenceThenThrowsFilterShapeNotSupported(): void
+    {
+        /** @Given a query mixing AND and OR connectives so the top filter is an OR group */
+        $query = Query::from(parameters: ['filter' => 'a==1;b==2,c==3']);
+
+        /** @Then an exception indicating the filter shape is not supported is raised */
+        $this->expectException(FilterShapeNotSupported::class);
+        $this->expectExceptionMessage('is not supported');
+
+        /** @When building the criteria from the query */
+        Criteria::fromQuery(request: $query, schema: $this->schema);
+    }
+
+    public function testFromQueryWhenNestedGroupThenThrowsFilterShapeNotSupported(): void
+    {
+        /** @Given a query whose parentheses nest an OR group inside an AND group */
+        $query = Query::from(parameters: ['filter' => '(a==1,b==2);c==3']);
+
+        /** @Then an exception carrying the raw filter query string is raised */
+        $this->expectException(FilterShapeNotSupported::class);
+        $this->expectExceptionMessage('Filter shape <(a==1,b==2);c==3> is not supported.');
+
+        /** @When building the criteria from the query */
+        Criteria::fromQuery(request: $query, schema: $this->schema);
+    }
+
+    public function testFromQueryWhenFieldNotAllowedThenThrowsFilterFieldNotAllowed(): void
+    {
+        /** @Given a schema allowing only the status field */
+        $schema = Schema::create()->filterable(field: 'status', operators: [Operator::EQUAL]);
+
+        /** @And a query filtering by a field that was never allowed */
+        $query = Query::from(parameters: ['filter' => 'discount==10']);
+
+        /** @Then an exception indicating the filter field is not allowed is raised */
+        $this->expectException(FilterFieldNotAllowed::class);
+        $this->expectExceptionMessage('Filter field <discount> is not allowed.');
+
+        /** @When building the criteria from the query */
+        Criteria::fromQuery(request: $query, schema: $schema);
+    }
+
+    public function testFromQueryWhenOperatorNotAllowedThenThrowsFilterOperatorNotAllowed(): void
+    {
+        /** @Given a schema allowing the status field under equality only */
+        $schema = Schema::create()->filterable(field: 'status', operators: [Operator::EQUAL]);
+
+        /** @And a query filtering the field with a disallowed operator */
+        $query = Query::from(parameters: ['filter' => 'status!=paid']);
+
+        /** @Then an exception indicating the filter operator is not allowed is raised */
+        $this->expectException(FilterOperatorNotAllowed::class);
+        $this->expectExceptionMessage('Operator <!=> is not allowed for filter field <status>.');
+
+        /** @When building the criteria from the query */
+        Criteria::fromQuery(request: $query, schema: $schema);
+    }
+
+    public function testFromQueryWhenValueNotPermittedThenThrowsFilterValueNotAllowed(): void
+    {
+        /** @Given a schema permitting only a fixed set of status values */
+        $schema = Schema::create()->filterable(
+            field: 'status',
+            operators: [Operator::EQUAL],
+            values: ['paid', 'pending']
+        );
+
+        /** @And a query filtering by a value outside the permitted set */
+        $query = Query::from(parameters: ['filter' => 'status==shipped']);
+
+        /** @Then an exception indicating the value is not permitted is raised */
+        $this->expectException(FilterValueNotAllowed::class);
+        $this->expectExceptionMessage('Value <shipped> is not permitted for filter field <status>.');
+
+        /** @When building the criteria from the query */
+        Criteria::fromQuery(request: $query, schema: $schema);
+    }
+
+    public function testFromQueryWhenValueBreaksKindThenThrowsFilterValueNotAllowed(): void
+    {
+        /** @Given a schema expecting a date-time kind on the created_at field */
+        $schema = Schema::create()->filterable(
+            field: 'created_at',
+            operators: [Operator::GREATER_THAN],
+            kind: ValueKind::DATETIME
+        );
+
+        /** @And a query whose value is not a valid date-time */
+        $query = Query::from(parameters: ['filter' => 'created_at=gt=not-a-date']);
+
+        /** @Then an exception indicating the value does not match the expected kind is raised */
+        $this->expectException(FilterValueNotAllowed::class);
+        $this->expectExceptionMessage('does not match the datetime kind');
+
+        /** @When building the criteria from the query */
+        Criteria::fromQuery(request: $query, schema: $schema);
+    }
+
+    public function testFromQueryWhenInListHasDisallowedValueThenThrowsFilterValueNotAllowed(): void
+    {
+        /** @Given a schema permitting only a fixed set of status values under IN */
+        $schema = Schema::create()->filterable(
+            field: 'status',
+            operators: [Operator::IN],
+            values: ['paid', 'pending']
+        );
+
+        /** @And a query whose IN list carries a value outside the permitted set */
+        $query = Query::from(parameters: ['filter' => 'status=in=(paid,shipped)']);
+
+        /** @Then an exception indicating the filter value is not allowed is raised */
+        $this->expectException(FilterValueNotAllowed::class);
+
+        /** @When building the criteria from the query */
+        Criteria::fromQuery(request: $query, schema: $schema);
     }
 
     #[DataProvider('comparisonOperatorCases')]
-    public function testFilteringWhenComparisonOperatorGivenThenComparisonCarriesThatOperator(
+    public function testFromQueryWhenComparisonOperatorThenComparisonCarriesThatOperator(
         string $expression,
         Operator $expected
     ): void {
         /** @Given a query carrying a binary comparison using one RSQL operator */
         $query = Query::from(parameters: ['filter' => $expression]);
 
-        /** @When reading the filtering specification */
-        $filter = Criteria::fromQuery(request: $query)->filtering();
+        /** @When reading the validated comparisons */
+        $comparisons = Criteria::fromQuery(request: $query, schema: $this->schema)->comparisons();
 
-        /** @Then the filter is a comparison on the left field carrying the expected operator */
-        self::assertEquals(Comparison::of(field: 'a', values: ['b'], operator: $expected), $filter);
+        /** @Then the only comparison carries the expected operator */
+        self::assertEquals([Comparison::of(field: 'a', values: ['b'], operator: $expected)], $comparisons);
     }
 
     #[DataProvider('malformedExpressionCases')]
-    public function testFilteringWhenMalformedExpressionGivenThenThrowsFilterExpressionIsInvalid(
+    public function testFromQueryWhenMalformedExpressionThenThrowsFilterExpressionIsInvalid(
         string $expression
     ): void {
         /** @Given a query carrying a filter expression that breaks the RSQL grammar */
@@ -318,46 +315,7 @@ final class FilterTest extends TestCase
         $this->expectExceptionMessage('could not be parsed');
 
         /** @When building the criteria from the query */
-        Criteria::fromQuery(request: $query);
-    }
-
-    public function testValuesWhenComparisonGivenThenReturnsTheComparedValues(): void
-    {
-        /** @Given an IN comparison carrying several values */
-        $comparison = Comparison::of(field: 'role', values: ['admin', 'user'], operator: Operator::IN);
-
-        /** @When reading the compared values */
-        $values = $comparison->values();
-
-        /** @Then it returns the values compared against the field in order */
-        self::assertSame(['admin', 'user'], $values);
-    }
-
-    public function testOperatorWhenComparisonGivenThenReturnsTheComparisonOperator(): void
-    {
-        /** @Given an equality comparison */
-        $comparison = Comparison::of(field: 'status', values: ['paid'], operator: Operator::EQUAL);
-
-        /** @When reading the comparison operator */
-        $operator = $comparison->operator();
-
-        /** @Then it returns the operator the comparison carries */
-        self::assertSame(Operator::EQUAL, $operator);
-    }
-
-    public function testOperatorWhenGroupGivenThenReturnsTheLogicalConnective(): void
-    {
-        /** @Given an AND group joining two comparisons */
-        $group = Group::of(filters: [
-            Comparison::of(field: 'a', values: ['1'], operator: Operator::EQUAL),
-            Comparison::of(field: 'b', values: ['2'], operator: Operator::EQUAL)
-        ], operator: LogicalOperator::AND);
-
-        /** @When reading the logical connective */
-        $operator = $group->operator();
-
-        /** @Then it returns the connective joining the children */
-        self::assertSame(LogicalOperator::AND, $operator);
+        Criteria::fromQuery(request: $query, schema: $this->schema);
     }
 
     public static function comparisonOperatorCases(): array

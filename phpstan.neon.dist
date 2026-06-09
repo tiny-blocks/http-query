@@ -20,12 +20,45 @@ parameters:
           path: src/Sort.php
         - identifier: return.type
           path: src/Sort.php
+        # The sortable fields are a list of strings carried on the schema constructor.
+        - identifier: missingType.iterableValue
+          path: src/Schema.php
+        # The validated conjunction is a list of comparisons produced by the shape walker.
+        - identifier: missingType.iterableValue
+          path: src/Internal/Conjunction.php
+        # The filter marker is sealed by Comparison and Group, so the renderer match is exhaustive.
+        - identifier: match.unhandled
+          path: src/Internal/Rsql/Renderer.php
+        # The parsed and validated specifications are lists carried by the internal query.
+        - identifier: missingType.iterableValue
+          path: src/Internal/Query.php
+        # The validated comparisons are a list carried on the cursor criteria.
+        - identifier: missingType.iterableValue
+          path: src/Cursor/Criteria.php
+        - identifier: return.type
+          path: src/Cursor/Criteria.php
+        # The validated comparisons are a list carried on the offset criteria.
+        - identifier: missingType.iterableValue
+          path: src/Offset/Criteria.php
+        - identifier: return.type
+          path: src/Offset/Criteria.php
+        # The permitted operators and values are lists carried on a value-object collaborator.
+        - identifier: missingType.iterableValue
+          path: src/Internal/AllowedField.php
+        - identifier: missingType.iterableValue
+          path: src/Internal/AllowedFilters.php
         # reduce() folds the links into the associative body; phpstan widens the carry to array<mixed>.
         - identifier: return.type
           path: src/Links.php
+        # The page metadata is an associative array of scalars passed through to the response body.
+        - identifier: missingType.iterableValue
+          path: src/Internal/Rendering.php
+        # The page items are an opaque collection forwarded as-is to the response body.
+        - identifier: missingType.generics
+          path: src/Internal/Rendering.php
         # Cursor key values are opaque, decoded scalars carried on a constructor parameter.
         - identifier: missingType.iterableValue
-          path: src/Cursor.php
+          path: src/Cursor/Token.php
         # The cursor codec encodes and decodes opaque key values whose types are not known.
         - identifier: missingType.iterableValue
           path: src/Internal/Cursor/CursorCodec.php

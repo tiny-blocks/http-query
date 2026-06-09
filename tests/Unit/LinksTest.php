@@ -8,28 +8,190 @@ use PHPUnit\Framework\TestCase;
 use ReflectionClass;
 use ReflectionMethod;
 use Test\TinyBlocks\HttpQuery\Models\Query;
-use TinyBlocks\Collection\Collection;
-use TinyBlocks\HttpQuery\Criteria;
-use TinyBlocks\HttpQuery\Cursor;
-use TinyBlocks\HttpQuery\CursorPage;
-use TinyBlocks\HttpQuery\CursorPagination;
+use TinyBlocks\HttpQuery\Comparison;
+use TinyBlocks\HttpQuery\Group;
 use TinyBlocks\HttpQuery\Internal\Uri;
 use TinyBlocks\HttpQuery\Links;
+use TinyBlocks\HttpQuery\LogicalOperator;
+use TinyBlocks\HttpQuery\Navigation;
+use TinyBlocks\HttpQuery\Offset\Criteria;
+use TinyBlocks\HttpQuery\Offset\Pagination;
+use TinyBlocks\HttpQuery\Operator;
+use TinyBlocks\HttpQuery\Sort;
 
 final class LinksTest extends TestCase
 {
+    public function testToArrayWhenInListFilterThenRendersParenthesizedValues(): void
+    {
+        /** @Given an IN comparison carrying several values */
+        $filter = Comparison::of(field: 'role', values: ['admin', 'user'], operator: Operator::IN);
+
+        /** @When rendering the navigation for a page carrying that filter */
+        $links = Links::from(
+            sort: Sort::fromExpression(expression: ''),
+            filter: $filter,
+            baseUri: '/v1/orders',
+            self: Pagination::fromPage(page: 1, perPage: 20),
+            navigation: Navigation::empty()
+        );
+
+        /** @Then the self link wraps the comma-joined values in parentheses */
+        self::assertSame(
+            '/v1/orders?filter=role=in=(admin,user)&page[number]=1&page[size]=20',
+            $links->toArray()['self']
+        );
+    }
+
+    public function testToArrayWhenReservedCharacterInValueThenQuotesIt(): void
+    {
+        /** @Given a comparison whose value carries a space */
+        $filter = Comparison::of(field: 'name', values: ['John Doe'], operator: Operator::EQUAL);
+
+        /** @When rendering the navigation for a page carrying that filter */
+        $links = Links::from(
+            sort: Sort::fromExpression(expression: ''),
+            filter: $filter,
+            baseUri: '/v1/orders',
+            self: Pagination::fromPage(page: 1, perPage: 20),
+            navigation: Navigation::empty()
+        );
+
+        /** @Then the self link renders the value within double quotes */
+        self::assertSame(
+            '/v1/orders?filter=name=="John Doe"&page[number]=1&page[size]=20',
+            $links->toArray()['self']
+        );
+    }
+
+    public function testToArrayWhenQuoteAndBackslashInValueThenEscapesBoth(): void
+    {
+        /** @Given a comparison whose value carries a double quote and a backslash */
+        $filter = Comparison::of(field: 'name', values: ['a"b\\c'], operator: Operator::EQUAL);
+
+        /** @When rendering the navigation for a page carrying that filter */
+        $links = Links::from(
+            sort: Sort::fromExpression(expression: ''),
+            filter: $filter,
+            baseUri: '/v1/orders',
+            self: Pagination::fromPage(page: 1, perPage: 20),
+            navigation: Navigation::empty()
+        );
+
+        /** @Then the self link escapes the quote and the backslash within the double-quoted value */
+        self::assertSame(
+            '/v1/orders?filter=name=="a\\"b\\\\c"&page[number]=1&page[size]=20',
+            $links->toArray()['self']
+        );
+    }
+
+    public function testToArrayWhenAndGroupFilterThenJoinsChildrenWithTheAndToken(): void
+    {
+        /** @Given an AND group of two comparisons */
+        $filter = Group::of(filters: [
+            Comparison::of(field: 'a', values: ['1'], operator: Operator::EQUAL),
+            Comparison::of(field: 'b', values: ['2'], operator: Operator::EQUAL)
+        ], operator: LogicalOperator::AND);
+
+        /** @When rendering the navigation for a page carrying that filter */
+        $links = Links::from(
+            sort: Sort::fromExpression(expression: ''),
+            filter: $filter,
+            baseUri: '/v1/orders',
+            self: Pagination::fromPage(page: 1, perPage: 20),
+            navigation: Navigation::empty()
+        );
+
+        /** @Then the self link joins the children with the AND token */
+        self::assertSame('/v1/orders?filter=a==1;b==2&page[number]=1&page[size]=20', $links->toArray()['self']);
+    }
+
+    public function testToArrayWhenOrGroupFilterThenJoinsChildrenWithTheOrToken(): void
+    {
+        /** @Given an OR group of two comparisons */
+        $filter = Group::of(filters: [
+            Comparison::of(field: 'a', values: ['1'], operator: Operator::EQUAL),
+            Comparison::of(field: 'b', values: ['2'], operator: Operator::EQUAL)
+        ], operator: LogicalOperator::OR);
+
+        /** @When rendering the navigation for a page carrying that filter */
+        $links = Links::from(
+            sort: Sort::fromExpression(expression: ''),
+            filter: $filter,
+            baseUri: '/v1/orders',
+            self: Pagination::fromPage(page: 1, perPage: 20),
+            navigation: Navigation::empty()
+        );
+
+        /** @Then the self link joins the children with the OR token */
+        self::assertSame('/v1/orders?filter=a==1,b==2&page[number]=1&page[size]=20', $links->toArray()['self']);
+    }
+
+    public function testToArrayWhenOrGroupNestedInAndThenWrapsItInParentheses(): void
+    {
+        /** @Given an AND group whose first child is an OR group */
+        $filter = Group::of(filters: [
+            Group::of(filters: [
+                Comparison::of(field: 'a', values: ['1'], operator: Operator::EQUAL),
+                Comparison::of(field: 'b', values: ['2'], operator: Operator::EQUAL)
+            ], operator: LogicalOperator::OR),
+            Comparison::of(field: 'c', values: ['3'], operator: Operator::EQUAL)
+        ], operator: LogicalOperator::AND);
+
+        /** @When rendering the navigation for a page carrying that filter */
+        $links = Links::from(
+            sort: Sort::fromExpression(expression: ''),
+            filter: $filter,
+            baseUri: '/v1/orders',
+            self: Pagination::fromPage(page: 1, perPage: 20),
+            navigation: Navigation::empty()
+        );
+
+        /** @Then the self link wraps the tighter-binding OR group in parentheses */
+        self::assertSame('/v1/orders?filter=(a==1,b==2);c==3&page[number]=1&page[size]=20', $links->toArray()['self']);
+    }
+
+    public function testToArrayWhenAndGroupNestedInOrThenLeavesItUnwrapped(): void
+    {
+        /** @Given an OR group whose first child is an AND group */
+        $filter = Group::of(filters: [
+            Group::of(filters: [
+                Comparison::of(field: 'a', values: ['1'], operator: Operator::EQUAL),
+                Comparison::of(field: 'b', values: ['2'], operator: Operator::EQUAL)
+            ], operator: LogicalOperator::AND),
+            Comparison::of(field: 'c', values: ['3'], operator: Operator::EQUAL)
+        ], operator: LogicalOperator::OR);
+
+        /** @When rendering the navigation for a page carrying that filter */
+        $links = Links::from(
+            sort: Sort::fromExpression(expression: ''),
+            filter: $filter,
+            baseUri: '/v1/orders',
+            self: Pagination::fromPage(page: 1, perPage: 20),
+            navigation: Navigation::empty()
+        );
+
+        /** @Then the self link leaves the tighter-binding AND group unwrapped */
+        self::assertSame('/v1/orders?filter=a==1;b==2,c==3&page[number]=1&page[size]=20', $links->toArray()['self']);
+    }
+
     public function testToArrayWhenPageIsTheLastThenOmitsTheNextRelation(): void
     {
         /** @Given a criteria pointing at the twenty-fourth page */
-        $criteria = Criteria::fromQuery(request: Query::from(parameters: [
-            'page' => ['number' => '24', 'size' => '20']
-        ]));
+        $criteria = Criteria::fromQuery(
+            request: Query::from(parameters: ['page' => ['number' => '24', 'size' => '20']])
+        );
 
         /** @And a page carrying a total spanning twenty-four pages */
-        $result = $criteria->offsetPage(items: Collection::createFrom(elements: range(1, 20)), total: 480);
+        $result = $criteria->page(total: 480, items: range(1, 20));
 
-        /** @When rendering the navigation for the last page */
-        $links = Links::from(baseUri: '/v1/orders', criteria: $criteria, navigation: $result->navigation());
+        /** @When rendering the navigation for the last page from its own pagination */
+        $links = Links::from(
+            sort: Sort::fromExpression(expression: ''),
+            filter: Group::none(),
+            baseUri: '/v1/orders',
+            self: Pagination::fromPage(page: 24, perPage: 20),
+            navigation: $result->navigation()
+        );
 
         /** @Then the navigation exposes the self, first, previous, and last relations in that order */
         self::assertSame([
@@ -45,18 +207,22 @@ final class LinksTest extends TestCase
 
     public function testToArrayWhenSliceMiddleThenExposesSelfFirstPrevAndNext(): void
     {
-        /** @Given a criteria carrying a filter and a sort at a middle page */
-        $criteria = Criteria::fromQuery(request: Query::from(parameters: [
-            'sort'   => '-created_at,id',
-            'page'   => ['number' => '3', 'size' => '20'],
-            'filter' => 'status==paid'
-        ]));
+        /** @Given a criteria at a middle page */
+        $criteria = Criteria::fromQuery(
+            request: Query::from(parameters: ['page' => ['number' => '3', 'size' => '20']])
+        );
 
         /** @And a slice fetched for the page size plus one so a next page exists */
-        $result = $criteria->offsetSlice(items: Collection::createFrom(elements: range(1, 21)));
+        $result = $criteria->slice(items: range(1, 21));
 
-        /** @When rendering the navigation for the slice */
-        $links = Links::from(baseUri: '/v1/orders', criteria: $criteria, navigation: $result->navigation());
+        /** @When rendering the navigation preserving a filter and a sort */
+        $links = Links::from(
+            sort: Sort::fromExpression(expression: '-created_at,id'),
+            filter: Comparison::of(field: 'status', values: ['paid'], operator: Operator::EQUAL),
+            baseUri: '/v1/orders',
+            self: Pagination::fromPage(page: 3, perPage: 20),
+            navigation: $result->navigation()
+        );
 
         /** @Then the navigation exposes the self, first, previous, and next relations preserving filter and sort */
         self::assertSame([
@@ -67,41 +233,24 @@ final class LinksTest extends TestCase
         ], $links->toArray());
     }
 
-    public function testToArrayWhenCursorResultThenExposesOnlySelfAndNext(): void
-    {
-        /** @Given a cursor criteria carrying an incoming cursor token and a page size of two */
-        $criteria = Criteria::fromQuery(request: Query::from(parameters: [
-            'page' => ['cursor' => Cursor::fromKeys(keys: [5])->toString(), 'size' => '2']
-        ]));
-
-        /** @And a cursor page fetched for the page size plus one with no incoming cursor */
-        $result = CursorPage::from(
-            items: Collection::createFrom(elements: [10, 20, 30]),
-            keysOf: static fn(mixed $element): array => [$element],
-            criteria: $criteria,
-            pagination: CursorPagination::from(cursor: Cursor::none(), perPage: 2)
-        );
-
-        /** @When rendering the navigation for the cursor page */
-        $links = Links::from(baseUri: '/v1/orders', criteria: $criteria, navigation: $result->navigation());
-
-        /** @Then the navigation exposes only the self and next relations */
-        self::assertSame([
-            'self' => sprintf('/v1/orders?page[cursor]=%s&page[size]=2', Cursor::fromKeys(keys: [5])->toString()),
-            'next' => sprintf('/v1/orders?page[cursor]=%s&page[size]=2', Cursor::fromKeys(keys: [20])->toString())
-        ], $links->toArray());
-    }
-
     public function testToArrayWhenPageIsTheFirstThenOmitsThePreviousRelation(): void
     {
         /** @Given a criteria pointing at the first page */
-        $criteria = Criteria::fromQuery(request: Query::from(parameters: []));
+        $criteria = Criteria::fromQuery(
+            request: Query::from(parameters: ['page' => ['number' => '1', 'size' => '20']])
+        );
 
         /** @And a page carrying a total spanning twenty-four pages */
-        $result = $criteria->offsetPage(items: Collection::createFrom(elements: range(1, 20)), total: 480);
+        $result = $criteria->page(total: 480, items: range(1, 20));
 
-        /** @When rendering the navigation for the first page */
-        $links = Links::from(baseUri: '/v1/orders', criteria: $criteria, navigation: $result->navigation());
+        /** @When rendering the navigation for the first page from its own pagination */
+        $links = Links::from(
+            sort: Sort::fromExpression(expression: ''),
+            filter: Group::none(),
+            baseUri: '/v1/orders',
+            self: Pagination::fromPage(page: 1, perPage: 20),
+            navigation: $result->navigation()
+        );
 
         /** @Then the navigation exposes the self, first, next, and last relations in that order */
         self::assertSame([
@@ -118,15 +267,21 @@ final class LinksTest extends TestCase
     public function testToArrayWhenSliceMiddleThenCarriesAFirstButNoLastRelation(): void
     {
         /** @Given a criteria pointing at a middle page */
-        $criteria = Criteria::fromQuery(request: Query::from(parameters: [
-            'page' => ['number' => '3', 'size' => '20']
-        ]));
+        $criteria = Criteria::fromQuery(
+            request: Query::from(parameters: ['page' => ['number' => '3', 'size' => '20']])
+        );
 
         /** @And a slice fetched for the page size plus one so a next page exists */
-        $result = $criteria->offsetSlice(items: Collection::createFrom(elements: range(1, 21)));
+        $result = $criteria->slice(items: range(1, 21));
 
-        /** @When rendering the navigation for the slice */
-        $links = Links::from(baseUri: '/v1/orders', criteria: $criteria, navigation: $result->navigation());
+        /** @When rendering the navigation for the slice from its own pagination */
+        $links = Links::from(
+            sort: Sort::fromExpression(expression: ''),
+            filter: Group::none(),
+            baseUri: '/v1/orders',
+            self: Pagination::fromPage(page: 3, perPage: 20),
+            navigation: $result->navigation()
+        );
 
         /** @Then the navigation carries a first relation */
         self::assertArrayHasKey('first', $links->toArray());
@@ -135,49 +290,24 @@ final class LinksTest extends TestCase
         self::assertArrayNotHasKey('last', $links->toArray());
     }
 
-    public function testToArrayWhenCursorResultThenCarriesNoFirstOrLastOrPreviousRelation(): void
-    {
-        /** @Given a cursor criteria carrying an incoming cursor token and a page size of two */
-        $criteria = Criteria::fromQuery(request: Query::from(parameters: [
-            'page' => ['cursor' => Cursor::fromKeys(keys: [5])->toString(), 'size' => '2']
-        ]));
-
-        /** @And a cursor page fetched for the page size plus one with no incoming cursor */
-        $result = CursorPage::from(
-            items: Collection::createFrom(elements: [10, 20, 30]),
-            keysOf: static fn(mixed $element): array => [$element],
-            criteria: $criteria,
-            pagination: CursorPagination::from(cursor: Cursor::none(), perPage: 2)
-        );
-
-        /** @When rendering the navigation for the cursor page */
-        $links = Links::from(baseUri: '/v1/orders', criteria: $criteria, navigation: $result->navigation());
-
-        /** @Then the navigation carries no first relation */
-        self::assertArrayNotHasKey('first', $links->toArray());
-
-        /** @And the navigation carries no last relation */
-        self::assertArrayNotHasKey('last', $links->toArray());
-
-        /** @And the navigation carries no previous relation */
-        self::assertArrayNotHasKey('prev', $links->toArray());
-    }
-
     public function testToHeaderWhenPageInTheMiddleThenFoldsEveryRelationIntoOneCommaJoinedValue(): void
     {
-        /** @Given a criteria carrying a filter and a sort at a middle page */
-        $criteria = Criteria::fromQuery(request: Query::from(parameters: [
-            'sort'   => '-created_at,id',
-            'page'   => ['number' => '3', 'size' => '20'],
-            'filter' => 'status==paid'
-        ]));
+        /** @Given a criteria at a middle page */
+        $criteria = Criteria::fromQuery(
+            request: Query::from(parameters: ['page' => ['number' => '3', 'size' => '20']])
+        );
 
         /** @And a page carrying a total spanning twenty-four pages */
-        $result = $criteria->offsetPage(items: Collection::createFrom(elements: range(1, 20)), total: 480);
+        $result = $criteria->page(total: 480, items: range(1, 20));
 
-        /** @When rendering the navigation as an RFC 8288 Link header */
-        $header = Links::from(baseUri: '/v1/orders', criteria: $criteria, navigation: $result->navigation())
-            ->toHeader();
+        /** @When rendering the navigation as an RFC 8288 Link header preserving a filter and a sort */
+        $header = Links::from(
+            sort: Sort::fromExpression(expression: '-created_at,id'),
+            filter: Comparison::of(field: 'status', values: ['paid'], operator: Operator::EQUAL),
+            baseUri: '/v1/orders',
+            self: Pagination::fromPage(page: 3, perPage: 20),
+            navigation: $result->navigation()
+        )->toHeader();
 
         /** @Then every present relation is folded into one comma-joined Link header value */
         self::assertSame(['Link' => [implode(', ', [
@@ -191,18 +321,22 @@ final class LinksTest extends TestCase
 
     public function testToArrayWhenPageInTheMiddleThenExposesEveryRelationPreservingFilterAndSort(): void
     {
-        /** @Given a criteria carrying a filter and a sort at a middle page */
-        $criteria = Criteria::fromQuery(request: Query::from(parameters: [
-            'sort'   => '-created_at,id',
-            'page'   => ['number' => '3', 'size' => '20'],
-            'filter' => 'status==paid'
-        ]));
+        /** @Given a criteria at a middle page */
+        $criteria = Criteria::fromQuery(
+            request: Query::from(parameters: ['page' => ['number' => '3', 'size' => '20']])
+        );
 
         /** @And a page carrying a total spanning twenty-four pages */
-        $result = $criteria->offsetPage(items: Collection::createFrom(elements: range(1, 20)), total: 480);
+        $result = $criteria->page(total: 480, items: range(1, 20));
 
-        /** @When rendering the navigation for the page */
-        $links = Links::from(baseUri: '/v1/orders', criteria: $criteria, navigation: $result->navigation());
+        /** @When rendering the navigation preserving a filter and a sort */
+        $links = Links::from(
+            sort: Sort::fromExpression(expression: '-created_at,id'),
+            filter: Comparison::of(field: 'status', values: ['paid'], operator: Operator::EQUAL),
+            baseUri: '/v1/orders',
+            self: Pagination::fromPage(page: 3, perPage: 20),
+            navigation: $result->navigation()
+        );
 
         /** @Then the navigation exposes every relation in semantic order preserving filter and sort */
         self::assertSame([

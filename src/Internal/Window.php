@@ -22,7 +22,7 @@ final readonly class Window
      * @param Collection<TValue> $items
      * @return Window<TValue>
      */
-    public static function from(Collection $items, int $limit): Window
+    public static function from(int $limit, Collection $items): Window
     {
         $elements = [...$items];
         $hasNext = count($elements) > $limit;

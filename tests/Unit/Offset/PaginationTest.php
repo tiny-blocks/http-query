@@ -2,20 +2,20 @@
 
 declare(strict_types=1);
 
-namespace Test\TinyBlocks\HttpQuery\Unit;
+namespace Test\TinyBlocks\HttpQuery\Unit\Offset;
 
 use PHPUnit\Framework\TestCase;
 use TinyBlocks\HttpQuery\Exceptions\OffsetOutOfRange;
 use TinyBlocks\HttpQuery\Exceptions\PageNumberOutOfRange;
 use TinyBlocks\HttpQuery\Exceptions\PageSizeOutOfRange;
-use TinyBlocks\HttpQuery\OffsetPagination;
+use TinyBlocks\HttpQuery\Offset\Pagination;
 
-final class OffsetPaginationTest extends TestCase
+final class PaginationTest extends TestCase
 {
     public function testFromOffsetWhenLimitIsOneThenLimitIsOne(): void
     {
         /** @When building a pagination from the minimum limit */
-        $pagination = OffsetPagination::fromOffset(offset: 0, limit: 1);
+        $pagination = Pagination::fromOffset(limit: 1, offset: 0);
 
         /** @Then the limit equals the minimum limit */
         self::assertSame(1, $pagination->limit());
@@ -24,7 +24,7 @@ final class OffsetPaginationTest extends TestCase
     public function testFromPageWhenPerPageIsOneThenLimitIsOne(): void
     {
         /** @When building a pagination from the minimum page size */
-        $pagination = OffsetPagination::fromPage(page: 1, perPage: 1);
+        $pagination = Pagination::fromPage(page: 1, perPage: 1);
 
         /** @Then the limit equals the minimum page size */
         self::assertSame(1, $pagination->limit());
@@ -33,7 +33,7 @@ final class OffsetPaginationTest extends TestCase
     public function testFromOffsetWhenZeroOffsetGivenThenPageIsOne(): void
     {
         /** @When building a pagination from a zero offset */
-        $pagination = OffsetPagination::fromOffset(offset: 0, limit: 20);
+        $pagination = Pagination::fromOffset(limit: 20, offset: 0);
 
         /** @Then the page number is one */
         self::assertSame(1, $pagination->page());
@@ -48,7 +48,7 @@ final class OffsetPaginationTest extends TestCase
     public function testFromPageWhenFirstPageGivenThenOffsetIsZero(): void
     {
         /** @When building a pagination from the first page */
-        $pagination = OffsetPagination::fromPage(page: 1, perPage: 20);
+        $pagination = Pagination::fromPage(page: 1, perPage: 20);
 
         /** @Then the page number is one */
         self::assertSame(1, $pagination->page());
@@ -63,7 +63,7 @@ final class OffsetPaginationTest extends TestCase
     public function testFromPageWhenThirdPageGivenThenOffsetIsDerived(): void
     {
         /** @When building a pagination from the third page */
-        $pagination = OffsetPagination::fromPage(page: 3, perPage: 20);
+        $pagination = Pagination::fromPage(page: 3, perPage: 20);
 
         /** @Then the page number is three */
         self::assertSame(3, $pagination->page());
@@ -78,7 +78,7 @@ final class OffsetPaginationTest extends TestCase
     public function testFromOffsetWhenAlignedOffsetGivenThenPageIsDerived(): void
     {
         /** @When building a pagination from an offset aligned to the limit */
-        $pagination = OffsetPagination::fromOffset(offset: 40, limit: 20);
+        $pagination = Pagination::fromOffset(limit: 20, offset: 40);
 
         /** @Then the page number is derived from the offset and the limit */
         self::assertSame(3, $pagination->page());
@@ -93,7 +93,7 @@ final class OffsetPaginationTest extends TestCase
     public function testFromOffsetWhenUnalignedOffsetGivenThenPageIsFloored(): void
     {
         /** @When building a pagination from an offset that is not aligned to the limit */
-        $pagination = OffsetPagination::fromOffset(offset: 45, limit: 20);
+        $pagination = Pagination::fromOffset(limit: 20, offset: 45);
 
         /** @Then the page number floors the offset division and adds one */
         self::assertSame(3, $pagination->page());
@@ -108,7 +108,7 @@ final class OffsetPaginationTest extends TestCase
     public function testToQueryStringWhenPageGivenThenRendersPageNumberAndSize(): void
     {
         /** @Given an offset pagination on the third page */
-        $pagination = OffsetPagination::fromPage(page: 3, perPage: 20);
+        $pagination = Pagination::fromPage(page: 3, perPage: 20);
 
         /** @When rendering it as a query string */
         $queryString = $pagination->toQueryString();
@@ -124,7 +124,7 @@ final class OffsetPaginationTest extends TestCase
         $this->expectExceptionMessage('Page number');
 
         /** @When building a pagination from a page number below one */
-        OffsetPagination::fromPage(page: 0, perPage: 20);
+        Pagination::fromPage(page: 0, perPage: 20);
     }
 
     public function testFromOffsetWhenLimitBelowOneGivenThenPageSizeOutOfRange(): void
@@ -134,7 +134,7 @@ final class OffsetPaginationTest extends TestCase
         $this->expectExceptionMessage('Page size');
 
         /** @When building a pagination from a limit below one */
-        OffsetPagination::fromOffset(offset: 0, limit: 0);
+        Pagination::fromOffset(limit: 0, offset: 0);
     }
 
     public function testFromOffsetWhenOffsetBelowZeroGivenThenOffsetOutOfRange(): void
@@ -144,7 +144,7 @@ final class OffsetPaginationTest extends TestCase
         $this->expectExceptionMessage('Offset');
 
         /** @When building a pagination from an offset below zero */
-        OffsetPagination::fromOffset(offset: -1, limit: 20);
+        Pagination::fromOffset(limit: 20, offset: -1);
     }
 
     public function testFromPageWhenPerPageBelowOneGivenThenPageSizeOutOfRange(): void
@@ -154,6 +154,6 @@ final class OffsetPaginationTest extends TestCase
         $this->expectExceptionMessage('Page size');
 
         /** @When building a pagination from a page size below one */
-        OffsetPagination::fromPage(page: 1, perPage: 0);
+        Pagination::fromPage(page: 1, perPage: 0);
     }
 }

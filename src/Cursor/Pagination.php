@@ -2,31 +2,32 @@
 
 declare(strict_types=1);
 
-namespace TinyBlocks\HttpQuery;
+namespace TinyBlocks\HttpQuery\Cursor;
 
 use TinyBlocks\HttpQuery\Exceptions\PageSizeOutOfRange;
 use TinyBlocks\HttpQuery\Internal\Limit;
+use TinyBlocks\HttpQuery\Pagination as PaginationContract;
 
 /**
  * Keyset (cursor) pagination request carrying the incoming cursor and the page size.
  */
-final readonly class CursorPagination implements Pagination
+final readonly class Pagination implements PaginationContract
 {
-    private function __construct(private Limit $limit, private Cursor $cursor)
+    private function __construct(private Limit $limit, private Token $cursor)
     {
     }
 
     /**
-     * Creates a CursorPagination from a cursor and a page size.
+     * Creates a Pagination from a cursor and a page size.
      *
-     * @param Cursor $cursor The incoming cursor.
+     * @param Token $cursor The incoming cursor.
      * @param int $perPage The page size.
-     * @return CursorPagination The pagination carrying the cursor and the limit.
+     * @return Pagination The pagination carrying the cursor and the limit.
      * @throws PageSizeOutOfRange If the page size is less than 1.
      */
-    public static function from(Cursor $cursor, int $perPage): CursorPagination
+    public static function from(Token $cursor, int $perPage): Pagination
     {
-        return new CursorPagination(limit: Limit::from(value: $perPage), cursor: $cursor);
+        return new Pagination(limit: Limit::from(value: $perPage), cursor: $cursor);
     }
 
     public function limit(): int
@@ -37,9 +38,9 @@ final readonly class CursorPagination implements Pagination
     /**
      * Returns the incoming cursor.
      *
-     * @return Cursor The cursor.
+     * @return Token The cursor.
      */
-    public function cursor(): Cursor
+    public function cursor(): Token
     {
         return $this->cursor;
     }

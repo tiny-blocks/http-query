@@ -26,9 +26,8 @@
     },
     "require": {
         "php": "^8.5",
-        "tiny-blocks/collection": "^2.4",
-        "tiny-blocks/encoder": "^3.2",
-        "tiny-blocks/http": "^6.1"
+        "tiny-blocks/collection": "^2.5",
+        "tiny-blocks/http": "^6.2"
     },
     "require-dev": {
         "ergebnis/composer-normalize": "^2.52",

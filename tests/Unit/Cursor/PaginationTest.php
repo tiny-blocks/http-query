@@ -2,19 +2,19 @@
 
 declare(strict_types=1);
 
-namespace Test\TinyBlocks\HttpQuery\Unit;
+namespace Test\TinyBlocks\HttpQuery\Unit\Cursor;
 
 use PHPUnit\Framework\TestCase;
-use TinyBlocks\HttpQuery\Cursor;
-use TinyBlocks\HttpQuery\CursorPagination;
+use TinyBlocks\HttpQuery\Cursor\Pagination;
+use TinyBlocks\HttpQuery\Cursor\Token;
 use TinyBlocks\HttpQuery\Exceptions\PageSizeOutOfRange;
 
-final class CursorPaginationTest extends TestCase
+final class PaginationTest extends TestCase
 {
     public function testFromWhenPageSizeIsTheMinimumThenCarriesThatLimit(): void
     {
         /** @Given a cursor pagination built from an absent cursor and the minimum page size of 1 */
-        $pagination = CursorPagination::from(cursor: Cursor::none(), perPage: 1);
+        $pagination = Pagination::from(perPage: 1, cursor: Token::none());
 
         /** @When reading the page size limit */
         $limit = $pagination->limit();
@@ -26,7 +26,7 @@ final class CursorPaginationTest extends TestCase
     public function testToQueryStringWhenCursorAbsentThenRendersOnlyTheSize(): void
     {
         /** @Given a cursor pagination carrying an absent cursor and a page size */
-        $pagination = CursorPagination::from(cursor: Cursor::none(), perPage: 10);
+        $pagination = Pagination::from(perPage: 10, cursor: Token::none());
 
         /** @When rendering it as a query string */
         $queryString = $pagination->toQueryString();
@@ -38,7 +38,7 @@ final class CursorPaginationTest extends TestCase
     public function testFromWhenAbsentCursorGivenThenCarriesLimitAndAbsentCursor(): void
     {
         /** @Given a cursor pagination built from an absent cursor and a page size of 20 */
-        $pagination = CursorPagination::from(cursor: Cursor::none(), perPage: 20);
+        $pagination = Pagination::from(perPage: 20, cursor: Token::none());
 
         /** @When reading the page size limit */
         $limit = $pagination->limit();
@@ -53,19 +53,19 @@ final class CursorPaginationTest extends TestCase
     public function testFromWhenPageSizeBelowMinimumThenThrowsPageSizeOutOfRange(): void
     {
         /** @Given an absent cursor */
-        $cursor = Cursor::none();
+        $cursor = Token::none();
 
         /** @Then an exception indicating the page size is out of range is raised */
         $this->expectException(PageSizeOutOfRange::class);
 
         /** @When building a cursor pagination with a page size below the minimum */
-        CursorPagination::from(cursor: $cursor, perPage: 0);
+        Pagination::from(perPage: 0, cursor: $cursor);
     }
 
     public function testToQueryStringWhenCursorPresentThenRendersCursorAndSize(): void
     {
         /** @Given a cursor pagination carrying an incoming cursor and a page size */
-        $pagination = CursorPagination::from(cursor: Cursor::from(token: 'abc'), perPage: 10);
+        $pagination = Pagination::from(perPage: 10, cursor: Token::from(token: 'abc'));
 
         /** @When rendering it as a query string */
         $queryString = $pagination->toQueryString();
@@ -77,7 +77,7 @@ final class CursorPaginationTest extends TestCase
     public function testFromWhenIncomingCursorGivenThenCarriesLimitAndTheCursorToken(): void
     {
         /** @Given a cursor pagination built from an incoming cursor and a page size of 50 */
-        $pagination = CursorPagination::from(cursor: Cursor::from(token: 'abc'), perPage: 50);
+        $pagination = Pagination::from(perPage: 50, cursor: Token::from(token: 'abc'));
 
         /** @When reading the page size limit */
         $limit = $pagination->limit();

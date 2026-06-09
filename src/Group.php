@@ -4,8 +4,6 @@ declare(strict_types=1);
 
 namespace TinyBlocks\HttpQuery;
 
-use TinyBlocks\Collection\Collection;
-
 /**
  * Composite of the filter tree joining child filters under a single logical connective.
  */
@@ -60,20 +58,5 @@ final readonly class Group implements Filter
     public function operator(): LogicalOperator
     {
         return $this->operator;
-    }
-
-    public function toExpression(): Expression
-    {
-        $operator = $this->operator;
-
-        /** @var Collection<Filter> $filters */
-        $filters = Collection::createFrom(elements: $this->filters);
-
-        $value = $filters
-            ->map(transformations: static fn(Filter $filter): string => $filter->toExpression()
-                ->nestedWithin(parent: $operator))
-            ->joinToString(separator: $operator->value);
-
-        return Expression::grouped(value: $value, connective: $operator);
     }
 }

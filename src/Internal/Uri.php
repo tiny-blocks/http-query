@@ -5,6 +5,7 @@ declare(strict_types=1);
 namespace TinyBlocks\HttpQuery\Internal;
 
 use TinyBlocks\HttpQuery\Filter;
+use TinyBlocks\HttpQuery\Internal\Rsql\Renderer;
 use TinyBlocks\HttpQuery\Pagination;
 use TinyBlocks\HttpQuery\Sort;
 
@@ -20,7 +21,7 @@ final class Uri
 
         if (!$filter->isEmpty()) {
             $template = 'filter=%s';
-            $parameters[] = sprintf($template, $filter->toExpression()->value());
+            $parameters[] = sprintf($template, Renderer::from(filter: $filter));
         }
 
         if (!$sort->isEmpty()) {

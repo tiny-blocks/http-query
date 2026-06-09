@@ -2,37 +2,37 @@
 
 declare(strict_types=1);
 
-namespace Test\TinyBlocks\HttpQuery\Unit;
+namespace Test\TinyBlocks\HttpQuery\Unit\Offset;
 
 use PHPUnit\Framework\TestCase;
 use Test\TinyBlocks\HttpQuery\Models\Query;
-use TinyBlocks\Collection\Collection;
 use TinyBlocks\Collection\KeyPreservation;
 use TinyBlocks\Http\LinkRelation;
-use TinyBlocks\HttpQuery\Criteria;
 use TinyBlocks\HttpQuery\NavigationTarget;
-use TinyBlocks\HttpQuery\OffsetPagination;
-use TinyBlocks\HttpQuery\OffsetSlice;
+use TinyBlocks\HttpQuery\Offset\Criteria;
+use TinyBlocks\HttpQuery\Offset\Pagination;
 
-final class OffsetSliceTest extends TestCase
+final class SliceTest extends TestCase
 {
-    private Criteria $criteria;
-
-    protected function setUp(): void
+    public function testOffsetWhenSecondPageGivenThenReturnsTheZeroBasedOffset(): void
     {
-        $this->criteria = Criteria::fromQuery(request: Query::from(parameters: []));
+        /** @Given a criteria on the second page with a page size of three */
+        $criteria = Criteria::fromQuery(request: Query::from(parameters: ['page' => ['number' => '2', 'size' => '3']]));
+
+        /** @When building the slice from the items fetched for the page size plus one */
+        $slice = $criteria->slice(items: ['a', 'b', 'c', 'd']);
+
+        /** @Then the offset is derived from the page and the page size */
+        self::assertSame(3, $slice->offset());
     }
 
     public function testToResponseWhenSliceGivenThenRendersBodyAndLinkHeader(): void
     {
-        /** @Given query parameters on the second page with a page size of three */
-        $query = Query::from(parameters: ['page' => ['number' => '2', 'size' => '3']]);
+        /** @Given a criteria on the second page with a page size of three */
+        $criteria = Criteria::fromQuery(request: Query::from(parameters: ['page' => ['number' => '2', 'size' => '3']]));
 
-        /** @And the criteria parsed from those parameters */
-        $criteria = Criteria::fromQuery(request: $query);
-
-        /** @And a slice built from the criteria over items fetched for the page size plus one */
-        $slice = $criteria->offsetSlice(items: ['a', 'b', 'c', 'd']);
+        /** @And a slice built from items fetched for the page size plus one */
+        $slice = $criteria->slice(items: ['a', 'b', 'c', 'd']);
 
         /** @When rendering the slice as a JSON:API response over the orders base URI */
         $response = $slice->toResponse(baseUri: '/v1/orders');
@@ -63,31 +63,13 @@ final class OffsetSliceTest extends TestCase
         ]), $response->getHeaderLine('Link'));
     }
 
-    public function testOffsetWhenSecondPageGivenThenReturnsTheZeroBasedOffset(): void
-    {
-        /** @Given a pagination on the second page with a page size of three */
-        $pagination = OffsetPagination::fromPage(page: 2, perPage: 3);
-
-        /** @And items fetched for the page size plus one */
-        $items = Collection::createFrom(elements: ['a', 'b', 'c', 'd']);
-
-        /** @When building the slice from the items and the pagination */
-        $slice = OffsetSlice::from(items: $items, criteria: $this->criteria, pagination: $pagination);
-
-        /** @Then the offset is derived from the page and the page size */
-        self::assertSame(3, $slice->offset());
-    }
-
     public function testNavigationWhenExtraElementFetchedThenHasNextAndTrimsItems(): void
     {
-        /** @Given a pagination on the second page with a page size of three */
-        $pagination = OffsetPagination::fromPage(page: 2, perPage: 3);
+        /** @Given a criteria on the second page with a page size of three */
+        $criteria = Criteria::fromQuery(request: Query::from(parameters: ['page' => ['number' => '2', 'size' => '3']]));
 
-        /** @And items fetched for the page size plus one */
-        $items = Collection::createFrom(elements: ['a', 'b', 'c', 'd']);
-
-        /** @When building the slice from the items and the pagination */
-        $slice = OffsetSlice::from(items: $items, criteria: $this->criteria, pagination: $pagination);
+        /** @When building the slice from the items fetched for the page size plus one */
+        $slice = $criteria->slice(items: ['a', 'b', 'c', 'd']);
 
         /** @Then the slice reports a next page */
         self::assertTrue($slice->hasNext());
@@ -121,14 +103,11 @@ final class OffsetSliceTest extends TestCase
 
     public function testNavigationWhenNoExtraElementOnFirstPageThenNoNextAndNoPrevious(): void
     {
-        /** @Given a pagination on the first page with a page size of three */
-        $pagination = OffsetPagination::fromPage(page: 1, perPage: 3);
+        /** @Given a criteria on the first page with a page size of three */
+        $criteria = Criteria::fromQuery(request: Query::from(parameters: ['page' => ['number' => '1', 'size' => '3']]));
 
-        /** @And items fetched within the page size */
-        $items = Collection::createFrom(elements: ['a', 'b', 'c']);
-
-        /** @When building the slice from the items and the pagination */
-        $slice = OffsetSlice::from(items: $items, criteria: $this->criteria, pagination: $pagination);
+        /** @When building the slice from items fetched within the page size */
+        $slice = $criteria->slice(items: ['a', 'b', 'c']);
 
         /** @Then the slice reports no next page */
         self::assertFalse($slice->hasNext());
@@ -151,12 +130,11 @@ final class OffsetSliceTest extends TestCase
 
     public function testNavigationWhenMiddlePageGivenThenListsFirstPreviousAndNextRelations(): void
     {
-        /** @Given a slice on a middle page fetched for the page size plus one */
-        $slice = OffsetSlice::from(
-            items: Collection::createFrom(elements: ['a', 'b', 'c', 'd']),
-            criteria: $this->criteria,
-            pagination: OffsetPagination::fromPage(page: 2, perPage: 3)
-        );
+        /** @Given a criteria on a middle page fetched for the page size plus one */
+        $criteria = Criteria::fromQuery(request: Query::from(parameters: ['page' => ['number' => '2', 'size' => '3']]));
+
+        /** @And a slice on that middle page */
+        $slice = $criteria->slice(items: ['a', 'b', 'c', 'd']);
 
         /** @When reading the relations of the navigation targets */
         $relations = $slice->navigation()->targets()
@@ -169,56 +147,47 @@ final class OffsetSliceTest extends TestCase
 
     public function testNavigationWhenMiddlePageGivenThenTheFirstTargetPointsAtTheFirstPage(): void
     {
-        /** @Given a slice on a middle page fetched for the page size plus one */
-        $slice = OffsetSlice::from(
-            items: Collection::createFrom(elements: ['a', 'b', 'c', 'd']),
-            criteria: $this->criteria,
-            pagination: OffsetPagination::fromPage(page: 2, perPage: 3)
-        );
+        /** @Given a criteria on a middle page fetched for the page size plus one */
+        $criteria = Criteria::fromQuery(request: Query::from(parameters: ['page' => ['number' => '2', 'size' => '3']]));
+
+        /** @And a slice on that middle page */
+        $slice = $criteria->slice(items: ['a', 'b', 'c', 'd']);
 
         /** @When reading the first navigation target */
         $target = $slice->navigation()->targets()->first();
 
         /** @Then the first target is the first page reached through the first relation */
         self::assertEquals(
-            NavigationTarget::to(
-                target: OffsetPagination::fromPage(page: 1, perPage: 3),
-                relation: LinkRelation::FIRST
-            ),
+            NavigationTarget::to(target: Pagination::fromPage(page: 1, perPage: 3), relation: LinkRelation::FIRST),
             $target
         );
     }
 
     public function testNavigationWhenMiddlePageGivenThenTheNextTargetPointsAtTheFollowingPage(): void
     {
-        /** @Given a slice on a middle page fetched for the page size plus one */
-        $slice = OffsetSlice::from(
-            items: Collection::createFrom(elements: ['a', 'b', 'c', 'd']),
-            criteria: $this->criteria,
-            pagination: OffsetPagination::fromPage(page: 2, perPage: 3)
-        );
+        /** @Given a criteria on a middle page fetched for the page size plus one */
+        $criteria = Criteria::fromQuery(request: Query::from(parameters: ['page' => ['number' => '2', 'size' => '3']]));
+
+        /** @And a slice on that middle page */
+        $slice = $criteria->slice(items: ['a', 'b', 'c', 'd']);
 
         /** @When reading the last navigation target */
         $target = $slice->navigation()->targets()->last();
 
         /** @Then the last target is the third page reached through the next relation */
         self::assertEquals(
-            NavigationTarget::to(
-                target: OffsetPagination::fromPage(page: 3, perPage: 3),
-                relation: LinkRelation::NEXT
-            ),
+            NavigationTarget::to(target: Pagination::fromPage(page: 3, perPage: 3), relation: LinkRelation::NEXT),
             $target
         );
     }
 
     public function testNavigationWhenFirstPageWithoutExtraElementThenListsOnlyTheFirstRelation(): void
     {
-        /** @Given a slice on the first page fetched within the page size */
-        $slice = OffsetSlice::from(
-            items: Collection::createFrom(elements: ['a', 'b', 'c']),
-            criteria: $this->criteria,
-            pagination: OffsetPagination::fromPage(page: 1, perPage: 3)
-        );
+        /** @Given a criteria on the first page fetched within the page size */
+        $criteria = Criteria::fromQuery(request: Query::from(parameters: ['page' => ['number' => '1', 'size' => '3']]));
+
+        /** @And a slice on that first page */
+        $slice = $criteria->slice(items: ['a', 'b', 'c']);
 
         /** @When reading the relations of the navigation targets */
         $relations = $slice->navigation()->targets()

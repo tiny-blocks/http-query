@@ -22,7 +22,7 @@ final readonly class PageNumber
         return new PageNumber(value: $value);
     }
 
-    public static function fromOffset(Offset $offset, Limit $limit): PageNumber
+    public static function fromOffset(Limit $limit, Offset $offset): PageNumber
     {
         return new PageNumber(value: intdiv($offset->value(), $limit->value()) + 1);
     }

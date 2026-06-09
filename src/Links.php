@@ -13,9 +13,10 @@ use TinyBlocks\HttpQuery\Internal\WebLink;
 /**
  * Navigation of a result, rendered as a JSON:API body links object or an RFC 8288 Link header.
  *
- * <p>It renders uniformly over a {@see Navigation}, building each URI from the criteria's filter and
- * sort plus the pagination of the self link and of every target, so the filter and the sort are
- * preserved in every URI.</p>
+ * <p>It renders uniformly over a {@see Navigation}, building each URI from the given filter and sort
+ * plus the pagination of the self link and of every target, so the filter and the sort are
+ * preserved in every URI. The self link is built from the page's own current pagination, so a cursor
+ * page renders a cursor self and an offset page renders an offset self.</p>
  */
 final readonly class Links
 {
@@ -27,23 +28,30 @@ final readonly class Links
     }
 
     /**
-     * Creates a Links from the base URI, the criteria, and the navigation of a result.
+     * Creates a Links from the sort, the page pagination, the filter, the base URI, and the navigation.
      *
+     * @param Sort $sort The sort preserved in every URI.
+     * @param Pagination $self The page's own current pagination, rendered as the self link.
+     * @param Filter $filter The filter preserved in every URI.
      * @param string $baseUri The base URI the navigation URIs are built on.
-     * @param Criteria $criteria The criteria that produced the result.
      * @param Navigation $navigation The navigation the result exposes.
      * @return Links The navigation for the result.
      */
-    public static function from(string $baseUri, Criteria $criteria, Navigation $navigation): Links
-    {
+    public static function from(
+        Sort $sort,
+        Pagination $self,
+        Filter $filter,
+        string $baseUri,
+        Navigation $navigation
+    ): Links {
         $uriFor = static fn(Pagination $pagination): string => Uri::from(
-            sort: $criteria->sorting(),
-            filter: $criteria->filtering(),
+            sort: $sort,
+            filter: $filter,
             baseUri: $baseUri,
             pagination: $pagination
         );
 
-        $self = new WebLink(uri: $uriFor($criteria->pagination()), relation: LinkRelation::SELF);
+        $current = new WebLink(uri: $uriFor($self), relation: LinkRelation::SELF);
 
         /** @var Collection<WebLink> $links */
         $links = $navigation->targets()->map(
@@ -53,7 +61,7 @@ final readonly class Links
             )
         );
 
-        return new Links(self: $self, links: $links);
+        return new Links(self: $current, links: $links);
     }
 
     /**

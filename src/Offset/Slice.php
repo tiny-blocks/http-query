@@ -2,68 +2,64 @@
 
 declare(strict_types=1);
 
-namespace TinyBlocks\HttpQuery;
+namespace TinyBlocks\HttpQuery\Offset;
 
 use Psr\Http\Message\ResponseInterface;
 use TinyBlocks\Collection\Collection;
 use TinyBlocks\Http\LinkRelation;
-use TinyBlocks\Http\Server\Response;
-use TinyBlocks\HttpQuery\Internal\Limit;
-use TinyBlocks\HttpQuery\Internal\Offset\Offset;
-use TinyBlocks\HttpQuery\Internal\Offset\OffsetNavigator;
-use TinyBlocks\HttpQuery\Internal\Offset\PageNumber;
+use TinyBlocks\HttpQuery\Filter;
+use TinyBlocks\HttpQuery\Internal\Offset\OffsetNavigation;
+use TinyBlocks\HttpQuery\Internal\Rendering;
 use TinyBlocks\HttpQuery\Internal\Window;
+use TinyBlocks\HttpQuery\Navigation;
+use TinyBlocks\HttpQuery\Sort;
 
 /**
  * Offset-based slice carrying its items and the next-page hint, without a total element count.
  *
  * @template TValue
  */
-final readonly class OffsetSlice
+final readonly class Slice
 {
     /**
      * @param Collection<TValue> $items
      */
     private function __construct(
+        private Sort $sort,
         private Collection $items,
-        private bool $hasNext,
-        private Criteria $criteria,
-        private OffsetNavigator $navigator,
-        private PageNumber $pageNumber,
-        private OffsetPagination $pagination
+        private Filter $filter,
+        private OffsetNavigation $paging,
+        private Pagination $pagination
     ) {
     }
 
     /**
-     * Creates an OffsetSlice from the items, the criteria, and the pagination.
+     * Creates a Slice from the sort, the items, the filter, and the pagination.
      *
      * <p>The consumer fetches one element beyond the page size. The extra element is trimmed and
      * its presence is read as the next-page hint.</p>
      *
      * @template TElement
+     * @param Sort $sort The submitted sort preserved in every rendered URI.
      * @param iterable<TElement> $items The items fetched for the page size plus one.
-     * @param Criteria $criteria The criteria that produced the result.
-     * @param OffsetPagination $pagination The pagination describing the current page.
-     * @return OffsetSlice<TElement> The slice carrying the trimmed items and the next-page hint.
+     * @param Filter $filter The filter preserved in every rendered URI.
+     * @param Pagination $pagination The pagination describing the current page.
+     * @return Slice<TElement> The slice carrying the trimmed items and the next-page hint.
      */
-    public static function from(iterable $items, Criteria $criteria, OffsetPagination $pagination): OffsetSlice
+    public static function from(Sort $sort, iterable $items, Filter $filter, Pagination $pagination): Slice
     {
-        $limit = Limit::from(value: $pagination->limit());
-        $offset = Offset::from(value: $pagination->offset());
-
         /** @var Collection<TElement> $collection */
         $collection = Collection::createFrom(elements: $items);
-        $window = Window::from(items: $collection, limit: $pagination->limit());
+        $window = Window::from(limit: $pagination->limit(), items: $collection);
 
         /** @var Collection<TElement> $trimmed */
         $trimmed = $window->items();
 
-        return new OffsetSlice(
+        return new Slice(
+            sort: $sort,
             items: $trimmed,
-            hasNext: $window->hasNext(),
-            criteria: $criteria,
-            navigator: OffsetNavigator::from(pagination: $pagination),
-            pageNumber: PageNumber::fromOffset(offset: $offset, limit: $limit),
+            filter: $filter,
+            paging: OffsetNavigation::from(hasNext: $window->hasNext(), pagination: $pagination),
             pagination: $pagination
         );
     }
@@ -71,21 +67,21 @@ final readonly class OffsetSlice
     /**
      * Returns the pagination for the next page, or null when there is none.
      *
-     * @return OffsetPagination|null The pagination for the next page, or null.
+     * @return Pagination|null The pagination for the next page, or null.
      */
-    public function next(): ?OffsetPagination
+    public function next(): ?Pagination
     {
-        return $this->hasNext ? $this->navigator->next() : null;
+        return $this->paging->next();
     }
 
     /**
      * Returns the pagination for the first page.
      *
-     * @return OffsetPagination The pagination for the first page.
+     * @return Pagination The pagination for the first page.
      */
-    public function first(): OffsetPagination
+    public function first(): Pagination
     {
-        return $this->navigator->first();
+        return $this->paging->first();
     }
 
     /**
@@ -105,7 +101,7 @@ final readonly class OffsetSlice
      */
     public function offset(): int
     {
-        return $this->pagination->offset();
+        return $this->paging->offset();
     }
 
     /**
@@ -115,7 +111,7 @@ final readonly class OffsetSlice
      */
     public function hasNext(): bool
     {
-        return $this->hasNext;
+        return $this->paging->hasNext();
     }
 
     /**
@@ -126,21 +122,21 @@ final readonly class OffsetSlice
     public function metadata(): array
     {
         return [
-            'has_next'     => $this->hasNext,
-            'per_page'     => $this->pagination->limit(),
-            'current_page' => $this->pageNumber->value(),
-            'has_previous' => $this->hasPrevious()
+            'has_next'     => $this->paging->hasNext(),
+            'per_page'     => $this->paging->limit(),
+            'current_page' => $this->paging->currentPage(),
+            'has_previous' => $this->paging->hasPrevious()
         ];
     }
 
     /**
      * Returns the pagination for the previous page, or null when there is none.
      *
-     * @return OffsetPagination|null The pagination for the previous page, or null.
+     * @return Pagination|null The pagination for the previous page, or null.
      */
-    public function previous(): ?OffsetPagination
+    public function previous(): ?Pagination
     {
-        return $this->navigator->previous();
+        return $this->paging->previous();
     }
 
     /**
@@ -164,13 +160,15 @@ final readonly class OffsetSlice
      */
     public function toResponse(string $baseUri): ResponseInterface
     {
-        $links = Links::from(baseUri: $baseUri, criteria: $this->criteria, navigation: $this->navigation());
-
-        return Response::ok([
-            'data'  => $this->items->toArray(),
-            'meta'  => $this->metadata(),
-            'links' => $links->toArray()
-        ], $links->toHeader());
+        return Rendering::of(
+            sort: $this->sort,
+            self: $this->pagination,
+            items: $this->items,
+            filter: $this->filter,
+            baseUri: $baseUri,
+            metadata: $this->metadata(),
+            navigation: $this->navigation()
+        );
     }
 
     /**
@@ -180,7 +178,7 @@ final readonly class OffsetSlice
      */
     public function currentPage(): int
     {
-        return $this->pageNumber->value();
+        return $this->paging->currentPage();
     }
 
     /**
@@ -190,6 +188,6 @@ final readonly class OffsetSlice
      */
     public function hasPrevious(): bool
     {
-        return !$this->navigator->isFirst();
+        return $this->paging->hasPrevious();
     }
 }

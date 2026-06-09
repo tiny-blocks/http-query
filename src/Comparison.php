@@ -4,8 +4,6 @@ declare(strict_types=1);
 
 namespace TinyBlocks\HttpQuery;
 
-use TinyBlocks\Collection\Collection;
-
 /**
  * Leaf of the filter tree pairing a field with an operator and the values compared against it.
  */
@@ -54,6 +52,17 @@ final readonly class Comparison implements Filter
     }
 
     /**
+     * Tells whether the comparison targets the given field.
+     *
+     * @param string $field The field to compare against.
+     * @return bool True when the comparison targets the field.
+     */
+    public function hasField(string $field): bool
+    {
+        return $this->field === $field;
+    }
+
+    /**
      * Returns the comparison operator.
      *
      * @return Operator The comparison operator.
@@ -63,27 +72,24 @@ final readonly class Comparison implements Filter
         return $this->operator;
     }
 
-    public function toExpression(): Expression
+    /**
+     * Returns the first compared value.
+     *
+     * @return string The first of the values compared against the field.
+     */
+    public function firstValue(): string
     {
-        /** @var Collection<string> $values */
-        $values = Collection::createFrom(elements: $this->values);
+        return $this->values[0];
+    }
 
-        $arguments = $values
-            ->map(transformations: static function (string $value): string {
-                if ($value !== '' && preg_match('/[\s"\'();,=!~<>]/', $value) !== 1) {
-                    return $value;
-                }
-
-                $escaped = str_replace(['\\', '"'], ['\\\\', '\\"'], $value);
-                $template = '"%s"';
-
-                return sprintf($template, $escaped);
-            })
-            ->joinToString(separator: ',');
-
-        $wrapped = $this->operator->isMultiValued();
-        $template = $wrapped ? '%s%s(%s)' : '%s%s%s';
-
-        return Expression::atomic(value: sprintf($template, $this->field, $this->operator->value, $arguments));
+    /**
+     * Tells whether the comparison carries the given operator.
+     *
+     * @param Operator $operator The operator to compare against.
+     * @return bool True when the comparison carries the operator.
+     */
+    public function hasOperator(Operator $operator): bool
+    {
+        return $this->operator === $operator;
     }
 }
