@@ -9,7 +9,7 @@ use InvalidArgumentException;
 /**
  * Raised when an incoming filter is not a comparison or a flat AND group of comparisons.
  *
- * The filter rules validate a conjunction of comparisons. An OR group, or a group nested inside
+ * The supported shape is a conjunction of comparisons. An OR group, or a group nested inside
  * another group, cannot be flattened into that shape and is rejected.
  */
 final class FilterShapeNotSupported extends InvalidArgumentException implements HttpQueryException

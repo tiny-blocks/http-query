@@ -1,6 +1,6 @@
 {
     "name": "tiny-blocks/http-query",
-    "description": "Typed, framework and database-agnostic toolkit for HTTP collection queries with RSQL filtering, sorting, and offset and cursor pagination.",
+    "description": "Typed, framework-independent toolkit for HTTP collection queries (RSQL filtering, sorting, and offset and cursor pagination) that never touches a data store.",
     "license": "MIT",
     "type": "library",
     "keywords": [

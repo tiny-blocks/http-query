@@ -7,10 +7,10 @@ namespace TinyBlocks\HttpQuery\Exceptions;
 use InvalidArgumentException;
 
 /**
- * Raised when an incoming sort orders by a field not declared through the sort rules.
+ * Raised when an incoming sort orders by a field not declared sortable on the schema.
  *
- * The consumer declares the sortable fields through the sort rules. A fixed rule allows none, so
- * any client-provided sort is rejected. An order by an undeclared field is likewise rejected.
+ * The consumer declares the sortable fields on the schema. When the schema declares none, any
+ * client-provided sort is rejected, and an order by an undeclared field is likewise rejected.
  */
 final class SortFieldNotAllowed extends InvalidArgumentException implements HttpQueryException
 {
@@ -26,7 +26,7 @@ final class SortFieldNotAllowed extends InvalidArgumentException implements Http
     /**
      * Creates a SortFieldNotAllowed from the disallowed field.
      *
-     * @param string $field The field that was never declared through the sort rules.
+     * @param string $field The field the schema did not declare sortable.
      * @return SortFieldNotAllowed The composed exception describing the disallowed field.
      */
     public static function from(string $field): SortFieldNotAllowed

@@ -10,8 +10,8 @@ use TinyBlocks\HttpQuery\Operator;
 /**
  * Raised when an incoming filter uses an operator not declared for the field.
  *
- * The consumer declares the operators each field accepts through the filter rules. A comparison
- * whose operator falls outside that set is rejected.
+ * The consumer declares the operators each field accepts on the schema. A comparison whose
+ * operator falls outside that set is rejected.
  */
 final class FilterOperatorNotAllowed extends InvalidArgumentException implements HttpQueryException
 {

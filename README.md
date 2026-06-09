@@ -17,7 +17,7 @@
 
 ## Overview
 
-A typed, framework- and database-agnostic toolkit for the query of an HTTP collection endpoint. The endpoint declares
+A typed, framework-independent toolkit for querying an HTTP collection endpoint. The endpoint declares
 the query contract once on a `Schema`, the library parses an incoming request query string against it, and the consumer
 reads an already-validated result: a conjunction of comparisons for filtering, an effective sort, and a pagination view.
 The result renders as a JSON:API response carrying an RFC 8288 `Link` header and a body `links` object.
@@ -289,7 +289,11 @@ $criteria = Criteria::fromQuery(request: $request, schema: $schema);
 $response = $criteria->page(total: 480, items: $items)->toResponse(baseUri: '/v1/orders');
 ```
 
-The body carries the navigation with the filter and the sort preserved in every URI.
+The body carries the data, the meta, and the links, with the filter and the sort preserved in every URI. The two
+approaches return different shapes, shown below.
+
+An **offset** page exposes the full window (`total`, `total_pages`, `current_page`, `has_previous`) and a link for
+every relation:
 
 ```json
 {
@@ -312,8 +316,6 @@ The body carries the navigation with the filter and the sort preserved in every 
 }
 ```
 
-The header folds the same relations into one RFC 8288 `Link` line.
-
 ```text
 Link: </v1/orders?filter=status==paid&sort=-created_at,id&page[number]=3&page[size]=20>; rel="self",
       </v1/orders?filter=status==paid&sort=-created_at,id&page[number]=1&page[size]=20>; rel="first",
@@ -322,9 +324,31 @@ Link: </v1/orders?filter=status==paid&sort=-created_at,id&page[number]=3&page[si
       </v1/orders?filter=status==paid&sort=-created_at,id&page[number]=24&page[size]=20>; rel="last"
 ```
 
+A **cursor** page is forward-only: `meta` carries only `has_next` and `per_page`, and `links` only `self` and `next`.
+For `GET /v1/orders?filter=status==paid&sort=-created_at,id&page[cursor]=BS3RvKY4LqEjYD19mQ0mCpJ&page[size]=20`:
+
+```json
+{
+    "data": [],
+    "meta": {
+        "has_next": true,
+        "per_page": 20
+    },
+    "links": {
+        "self": "/v1/orders?filter=status==paid&sort=-created_at,id&page[cursor]=BS3RvKY4LqEjYD19mQ0mCpJ&page[size]=20",
+        "next": "/v1/orders?filter=status==paid&sort=-created_at,id&page[cursor]=Pj9rZ0sB2xN7wK1dQmvY4La&page[size]=20"
+    }
+}
+```
+
+```text
+Link: </v1/orders?filter=status==paid&sort=-created_at,id&page[cursor]=BS3RvKY4LqEjYD19mQ0mCpJ&page[size]=20>; rel="self",
+      </v1/orders?filter=status==paid&sort=-created_at,id&page[cursor]=Pj9rZ0sB2xN7wK1dQmvY4La&page[size]=20>; rel="next"
+```
+
 The `links` keys are the canonical JSON:API relations, in the semantic order below. Unavailable relations are omitted,
-so the first page carries no `prev` and the last page carries no `next`. An `Offset\Slice` exposes `self`, `first`,
-`prev`, and `next` (no `last`), and a `Cursor\Page` is forward-only, so it exposes only `self` and `next`.
+so the first offset page carries no `prev` and the last carries no `next`, and an `Offset\Slice` omits `last` (it has
+no total).
 
 | Relation | Meaning            |
 |----------|--------------------|
@@ -354,8 +378,8 @@ fails at the boundary with a dedicated `HttpQueryException`, never reaching the 
 
 RSQL is a small, URI-safe grammar with a published reference, so the filter survives a query string without encoding and
 the same expression reads the same on the client and the server. The library is conjunction-only for the consumer: a
-single comparison or an AND group of comparisons flattens into the `list<Comparison>` the consumer applies,
-`AND` an `OR` or nested filter is rejected at parse.
+single comparison or an AND group of comparisons flattens into the `list<Comparison>` the consumer applies. An OR
+group, or a group nested inside another group, is rejected as an unsupported shape.
 
 > Zdenek Jirutka, *RSQL / FIQL parser* (https://github.com/jirutka/rsql-parser).
 
