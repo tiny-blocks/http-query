@@ -83,10 +83,10 @@ final class PageTest extends TestCase
         /** @And the metadata carries a zero total and zero total pages */
         self::assertSame([
             'total'        => 0,
-            'has_next'     => false,
             'per_page'     => 20,
             'total_pages'  => 0,
             'current_page' => 1,
+            'has_next'     => false,
             'has_previous' => false
         ], $page->metadata());
     }
@@ -170,10 +170,10 @@ final class PageTest extends TestCase
         /** @Then the metadata carries every navigation flag and count in length-ascending key order */
         self::assertSame([
             'total'        => 480,
-            'has_next'     => true,
             'per_page'     => 20,
             'total_pages'  => 24,
             'current_page' => 3,
+            'has_next'     => true,
             'has_previous' => true
         ], $page->metadata());
     }
@@ -215,10 +215,10 @@ final class PageTest extends TestCase
             'data'  => ['a', 'b'],
             'meta'  => [
                 'total'        => 480,
-                'has_next'     => true,
                 'per_page'     => 20,
                 'total_pages'  => 24,
                 'current_page' => 3,
+                'has_next'     => true,
                 'has_previous' => true
             ],
             'links' => [

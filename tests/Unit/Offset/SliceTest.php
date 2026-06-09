@@ -41,9 +41,9 @@ final class SliceTest extends TestCase
         self::assertSame([
             'data'  => ['a', 'b', 'c'],
             'meta'  => [
-                'has_next'     => true,
                 'per_page'     => 3,
                 'current_page' => 2,
+                'has_next'     => true,
                 'has_previous' => true
             ],
             'links' => [
@@ -94,9 +94,9 @@ final class SliceTest extends TestCase
 
         /** @And the metadata carries every navigation flag and count in length-ascending key order */
         self::assertSame([
-            'has_next'     => true,
             'per_page'     => 3,
             'current_page' => 2,
+            'has_next'     => true,
             'has_previous' => true
         ], $slice->metadata());
     }

@@ -50,7 +50,7 @@ final class PageTest extends TestCase
         self::assertCount(0, $page->navigation()->targets()->toArray());
 
         /** @And the metadata reports no next page in length-ascending key order */
-        self::assertSame(['has_next' => false, 'per_page' => 2], $page->metadata());
+        self::assertSame(['per_page' => 2, 'has_next' => false], $page->metadata());
     }
 
     public function testToResponseWhenCursorPageGivenThenRendersBodyAndLinkHeader(): void
@@ -74,8 +74,8 @@ final class PageTest extends TestCase
         self::assertSame([
             'data'  => [10, 20],
             'meta'  => [
-                'has_next' => true,
-                'per_page' => 2
+                'per_page' => 2,
+                'has_next' => true
             ],
             'links' => [
                 'self' => sprintf('/v1/orders?page[cursor]=%s&page[size]=2', $token),
@@ -108,8 +108,8 @@ final class PageTest extends TestCase
         self::assertSame([
             'data'  => [10, 20],
             'meta'  => [
-                'has_next' => true,
-                'per_page' => 2
+                'per_page' => 2,
+                'has_next' => true
             ],
             'links' => [
                 'self' => '/v1/orders?page[size]=2',
@@ -169,7 +169,7 @@ final class PageTest extends TestCase
         self::assertEquals(Pagination::from(cursor: Token::fromKeys(keys: [20]), perPage: 2), $mapped->next());
 
         /** @And the metadata is preserved in length-ascending key order */
-        self::assertSame(['has_next' => true, 'per_page' => 2], $mapped->metadata());
+        self::assertSame(['per_page' => 2, 'has_next' => true], $mapped->metadata());
     }
 
     public function testToResponseWhenPageIsMappedThenRendersProjectedDataAndPreservedLinks(): void
@@ -193,8 +193,8 @@ final class PageTest extends TestCase
         self::assertSame([
             'data'  => [10, 20],
             'meta'  => [
-                'has_next' => true,
-                'per_page' => 2
+                'per_page' => 2,
+                'has_next' => true
             ],
             'links' => [
                 'self' => sprintf('/v1/orders?page[cursor]=%s&page[size]=2', $token),
@@ -227,6 +227,6 @@ final class PageTest extends TestCase
         self::assertEquals(Pagination::from(cursor: Token::fromKeys(keys: [20]), perPage: 2), $page->next());
 
         /** @And the metadata carries the navigation flags in length-ascending key order */
-        self::assertSame(['has_next' => true, 'per_page' => 2], $page->metadata());
+        self::assertSame(['per_page' => 2, 'has_next' => true], $page->metadata());
     }
 }

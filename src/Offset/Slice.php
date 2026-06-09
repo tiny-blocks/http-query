@@ -122,9 +122,9 @@ final readonly class Slice
     public function metadata(): array
     {
         return [
-            'has_next'     => $this->paging->hasNext(),
             'per_page'     => $this->paging->limit(),
             'current_page' => $this->paging->currentPage(),
+            'has_next'     => $this->paging->hasNext(),
             'has_previous' => $this->paging->hasPrevious()
         ];
     }

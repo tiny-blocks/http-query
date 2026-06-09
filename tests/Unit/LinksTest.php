@@ -59,7 +59,7 @@ final class LinksTest extends TestCase
 
         /** @Then the self link renders the value within double quotes */
         self::assertSame(
-            '/v1/orders?filter=name=="John Doe"&page[number]=1&page[size]=20',
+            '/v1/orders?filter=name==%22John%20Doe%22&page[number]=1&page[size]=20',
             $links->toArray()['self']
         );
     }
@@ -80,9 +80,36 @@ final class LinksTest extends TestCase
 
         /** @Then the self link escapes the quote and the backslash within the double-quoted value */
         self::assertSame(
-            '/v1/orders?filter=name=="a\\"b\\\\c"&page[number]=1&page[size]=20',
+            '/v1/orders?filter=name==%22a%5C%22b%5C%5Cc%22&page[number]=1&page[size]=20',
             $links->toArray()['self']
         );
+    }
+
+    public function testToArrayWhenValueCarriesUnsafeAndStructuralCharactersThenEncodesOnlyTheUnsafeOnes(): void
+    {
+        /** @Given a comparison whose value carries query-unsafe and RSQL-structural characters */
+        $filter = Comparison::of(field: 'name', values: ["a&b#c%d=e;f,g(h)i!j k\r\n"], operator: Operator::EQUAL);
+
+        /** @And the readable link the decoded query is expected to round-trip to */
+        $template = '/v1/orders?filter=%s&page[number]=1&page[size]=20';
+
+        /** @When rendering the self link for a page carrying that filter */
+        $self = Links::from(
+            sort: Sort::fromExpression(expression: ''),
+            filter: $filter,
+            baseUri: '/v1/orders',
+            self: Pagination::fromPage(page: 1, perPage: 20),
+            navigation: Navigation::empty()
+        )->toArray()['self'];
+
+        /** @Then the unsafe characters stay percent-encoded while the structural and unreserved ones stay readable */
+        self::assertSame(
+            '/v1/orders?filter=name==%22a%26b%23c%25d=e;f,g(h)i!j%20k%0D%0A%22&page[number]=1&page[size]=20',
+            $self
+        );
+
+        /** @And URL-decoding the link recovers the readable form carrying the rendered RSQL */
+        self::assertSame(sprintf($template, Renderer::from(filter: $filter)), rawurldecode($self));
     }
 
     public function testToArrayWhenAndGroupFilterThenJoinsChildrenWithTheAndToken(): void
@@ -103,7 +130,10 @@ final class LinksTest extends TestCase
         );
 
         /** @Then the self link joins the children with the AND token */
-        self::assertSame('/v1/orders?filter=a==1;b==2&page[number]=1&page[size]=20', $links->toArray()['self']);
+        self::assertSame(
+            '/v1/orders?filter=a==1;b==2&page[number]=1&page[size]=20',
+            $links->toArray()['self']
+        );
     }
 
     public function testToArrayWhenOrGroupFilterThenJoinsChildrenWithTheOrToken(): void
@@ -124,7 +154,10 @@ final class LinksTest extends TestCase
         );
 
         /** @Then the self link joins the children with the OR token */
-        self::assertSame('/v1/orders?filter=a==1,b==2&page[number]=1&page[size]=20', $links->toArray()['self']);
+        self::assertSame(
+            '/v1/orders?filter=a==1,b==2&page[number]=1&page[size]=20',
+            $links->toArray()['self']
+        );
     }
 
     public function testToArrayWhenOrGroupNestedInAndThenWrapsItInParentheses(): void
@@ -148,7 +181,10 @@ final class LinksTest extends TestCase
         );
 
         /** @Then the self link wraps the tighter-binding OR group in parentheses */
-        self::assertSame('/v1/orders?filter=(a==1,b==2);c==3&page[number]=1&page[size]=20', $links->toArray()['self']);
+        self::assertSame(
+            '/v1/orders?filter=(a==1,b==2);c==3&page[number]=1&page[size]=20',
+            $links->toArray()['self']
+        );
     }
 
     public function testToArrayWhenAndGroupNestedInOrThenLeavesItUnwrapped(): void
@@ -172,7 +208,10 @@ final class LinksTest extends TestCase
         );
 
         /** @Then the self link leaves the tighter-binding AND group unwrapped */
-        self::assertSame('/v1/orders?filter=a==1;b==2,c==3&page[number]=1&page[size]=20', $links->toArray()['self']);
+        self::assertSame(
+            '/v1/orders?filter=a==1;b==2,c==3&page[number]=1&page[size]=20',
+            $links->toArray()['self']
+        );
     }
 
     public function testToArrayWhenPageIsTheLastThenOmitsTheNextRelation(): void

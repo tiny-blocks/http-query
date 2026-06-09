@@ -132,8 +132,8 @@ final readonly class Page
     public function metadata(): array
     {
         return [
-            'has_next' => $this->hasNext,
-            'per_page' => $this->pagination->limit()
+            'per_page' => $this->pagination->limit(),
+            'has_next' => $this->hasNext
         ];
     }
 

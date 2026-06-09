@@ -297,13 +297,26 @@ every relation:
 
 ```json
 {
-    "data": [],
+    "data": [
+        {
+            "id": 4821,
+            "status": "paid",
+            "total": 12990,
+            "created_at": "2026-01-29T14:05:00Z"
+        },
+        {
+            "id": 4820,
+            "status": "paid",
+            "total": 8400,
+            "created_at": "2026-01-29T13:51:00Z"
+        }
+    ],
     "meta": {
         "total": 480,
-        "has_next": true,
         "per_page": 20,
         "total_pages": 24,
         "current_page": 3,
+        "has_next": true,
         "has_previous": true
     },
     "links": {
@@ -329,10 +342,23 @@ For `GET /v1/orders?filter=status==paid&sort=-created_at,id&page[cursor]=BS3RvKY
 
 ```json
 {
-    "data": [],
+    "data": [
+        {
+            "id": 4821,
+            "status": "paid",
+            "total": 12990,
+            "created_at": "2026-01-29T14:05:00Z"
+        },
+        {
+            "id": 4820,
+            "status": "paid",
+            "total": 8400,
+            "created_at": "2026-01-29T13:51:00Z"
+        }
+    ],
     "meta": {
-        "has_next": true,
-        "per_page": 20
+        "per_page": 20,
+        "has_next": true
     },
     "links": {
         "self": "/v1/orders?filter=status==paid&sort=-created_at,id&page[cursor]=BS3RvKY4LqEjYD19mQ0mCpJ&page[size]=20",
@@ -381,7 +407,7 @@ the same expression reads the same on the client and the server. The library is 
 single comparison or an AND group of comparisons flattens into the `list<Comparison>` the consumer applies. An OR
 group, or a group nested inside another group, is rejected as an unsupported shape.
 
-> Zdenek Jirutka, *RSQL / FIQL parser* (https://github.com/jirutka/rsql-parser).
+> Zdenek Jirutka, *RSQL / FIQL parser*.
 
 ### 04. Why are the two pagination approaches split into separate contexts?
 
@@ -390,6 +416,14 @@ that infers the approach at runtime renders an inconsistent `self` link: the fir
 offset-style `self` while its `next` is cursor-style. Splitting the API into a `Cursor` context and an `Offset` context,
 each complete and approach-only, with the common building blocks at the root, makes every `self` link consistent with
 the page's own approach.
+
+### 05. How does the library help guard against injection?
+
+Field and operator names are validated against the `Schema` allowlist while parsing, so only declared identifiers ever
+reach your store. Comparison and cursor values are returned as data for you to bind as parameters, and the library
+builds no SQL. A cursor token is decoded only as a list of scalar values. Any unsafe character in the filter and sort
+echoed into the `links` object and the `Link` header is percent-encoded. Binding the values is still your
+responsibility.
 
 ## License
 

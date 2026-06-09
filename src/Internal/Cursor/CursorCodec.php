@@ -20,10 +20,16 @@ final class CursorCodec
             throw CursorIsInvalid::from(token: $token);
         }
 
-        $keys = json_decode($decoded);
+        $keys = json_decode($decoded, true);
 
-        if (!is_array($keys)) {
+        if (!is_array($keys) || !array_is_list($keys)) {
             throw CursorIsInvalid::from(token: $token);
+        }
+
+        foreach ($keys as $value) {
+            if (!is_scalar($value) && !is_null($value)) {
+                throw CursorIsInvalid::from(token: $token);
+            }
         }
 
         return $keys;

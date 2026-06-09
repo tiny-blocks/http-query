@@ -155,10 +155,10 @@ final readonly class Page
     {
         return [
             'total'        => $this->total->value(),
-            'has_next'     => $this->paging->hasNext(),
             'per_page'     => $this->paging->limit(),
             'total_pages'  => $this->pageCount->value(),
             'current_page' => $this->paging->currentPage(),
+            'has_next'     => $this->paging->hasNext(),
             'has_previous' => $this->paging->hasPrevious()
         ];
     }

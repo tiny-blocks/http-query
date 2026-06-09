@@ -21,17 +21,29 @@ final class Uri
 
         if (!$filter->isEmpty()) {
             $template = 'filter=%s';
-            $parameters[] = sprintf($template, Renderer::from(filter: $filter));
+            $parameters[] = sprintf($template, Uri::encode(value: Renderer::from(filter: $filter)));
         }
 
         if (!$sort->isEmpty()) {
             $template = 'sort=%s';
-            $parameters[] = sprintf($template, $sort->toExpression());
+            $parameters[] = sprintf($template, Uri::encode(value: $sort->toExpression()));
         }
 
         $parameters[] = $pagination->toQueryString();
         $template = '%s?%s';
 
         return sprintf($template, $baseUri, implode('&', $parameters));
+    }
+
+    private static function encode(string $value): string
+    {
+        return strtr(rawurlencode($value), [
+            '%3D' => '=',
+            '%3B' => ';',
+            '%2C' => ',',
+            '%28' => '(',
+            '%29' => ')',
+            '%21' => '!'
+        ]);
     }
 }

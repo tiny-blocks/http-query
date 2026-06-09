@@ -46,10 +46,10 @@ final class EndToEndTest extends TestCase
             'data'  => ['a', 'b'],
             'meta'  => [
                 'total'        => 480,
-                'has_next'     => true,
                 'per_page'     => 20,
                 'total_pages'  => 24,
                 'current_page' => 3,
+                'has_next'     => true,
                 'has_previous' => true
             ],
             'links' => [
@@ -125,8 +125,8 @@ final class EndToEndTest extends TestCase
         self::assertSame([
             'data'  => [['id' => 10], ['id' => 20]],
             'meta'  => [
-                'has_next' => true,
-                'per_page' => 2
+                'per_page' => 2,
+                'has_next' => true
             ],
             'links' => [
                 'self' => sprintf('%s&page[cursor]=%s&page[size]=2', $base, $token),

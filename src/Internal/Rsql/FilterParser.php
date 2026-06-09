@@ -12,6 +12,8 @@ use TinyBlocks\HttpQuery\LogicalOperator;
 
 final readonly class FilterParser
 {
+    private const int MAX_DEPTH = 32;
+
     private function __construct(private string $input, private Scanner $scanner)
     {
     }
@@ -23,7 +25,7 @@ final readonly class FilterParser
 
     public function parse(): Filter
     {
-        $filter = $this->disjunction();
+        $filter = $this->disjunction(depth: 0);
 
         if (!$this->scanner->isAtEnd()) {
             throw FilterExpressionIsInvalid::from(expression: $this->input);
@@ -32,35 +34,39 @@ final readonly class FilterParser
         return $filter;
     }
 
-    private function disjunction(): Filter
+    private function disjunction(int $depth): Filter
     {
-        $filters = [$this->conjunction()];
+        $filters = [$this->conjunction(depth: $depth)];
 
         while ($this->scanner->peek() === LogicalOperator::OR->value) {
             $this->scanner->expect(character: LogicalOperator::OR->value);
-            $filters[] = $this->conjunction();
+            $filters[] = $this->conjunction(depth: $depth);
         }
 
         return count($filters) === 1 ? $filters[0] : Group::of(filters: $filters, operator: LogicalOperator::OR);
     }
 
-    private function conjunction(): Filter
+    private function conjunction(int $depth): Filter
     {
-        $filters = [$this->constraint()];
+        $filters = [$this->constraint(depth: $depth)];
 
         while ($this->scanner->peek() === LogicalOperator::AND->value) {
             $this->scanner->expect(character: LogicalOperator::AND->value);
-            $filters[] = $this->constraint();
+            $filters[] = $this->constraint(depth: $depth);
         }
 
         return count($filters) === 1 ? $filters[0] : Group::of(filters: $filters, operator: LogicalOperator::AND);
     }
 
-    private function constraint(): Filter
+    private function constraint(int $depth): Filter
     {
         if ($this->scanner->peek() === '(') {
+            if ($depth >= FilterParser::MAX_DEPTH) {
+                throw FilterExpressionIsInvalid::from(expression: $this->input);
+            }
+
             $this->scanner->expect(character: '(');
-            $group = $this->disjunction();
+            $group = $this->disjunction(depth: $depth + 1);
             $this->scanner->expect(character: ')');
 
             return $group;

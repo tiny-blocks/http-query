@@ -153,6 +153,32 @@ final class TokenTest extends TestCase
         $token->toArray();
     }
 
+    public function testToArrayWhenTokenDecodesToObjectThenThrowsCursorIsInvalid(): void
+    {
+        /** @Given a base64url token whose decoded payload is a JSON object rather than a list */
+        $token = Token::from(token: rtrim(strtr(base64_encode('{"a":1}'), '+/', '-_'), '='));
+
+        /** @Then an exception indicating the cursor token is invalid is raised */
+        $this->expectException(CursorIsInvalid::class);
+        $this->expectExceptionMessage('could not be decoded');
+
+        /** @When decoding the token into key values */
+        $token->toArray();
+    }
+
+    public function testToArrayWhenTokenDecodesToListWithNestedStructureThenThrowsCursorIsInvalid(): void
+    {
+        /** @Given a base64url token whose decoded list carries a nested array and object */
+        $token = Token::from(token: rtrim(strtr(base64_encode('[["x"],{"a":1}]'), '+/', '-_'), '='));
+
+        /** @Then an exception indicating the cursor token is invalid is raised */
+        $this->expectException(CursorIsInvalid::class);
+        $this->expectExceptionMessage('could not be decoded');
+
+        /** @When decoding the token into key values */
+        $token->toArray();
+    }
+
     public function testFromKeysWhenRoundTrippedThroughTokenThenYieldsTheOriginalKeys(): void
     {
         /** @Given the opaque token produced from ordering key values */

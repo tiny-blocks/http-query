@@ -195,6 +195,44 @@ final class FilterTest extends TestCase
         ], $comparisons);
     }
 
+    public function testFromQueryWhenFilterNestedToTheMaximumDepthThenComparisonIsReturned(): void
+    {
+        /** @Given a filter template wrapping a comparison in placeholders */
+        $template = '%sa==1%s';
+
+        /** @And a query whose filter nests parentheses up to the maximum depth */
+        $query = Query::from(parameters: [
+            'filter' => sprintf($template, str_repeat('(', 32), str_repeat(')', 32))
+        ]);
+
+        /** @When reading the validated comparisons */
+        $comparisons = Criteria::fromQuery(request: $query, schema: $this->schema)->comparisons();
+
+        /** @Then the deeply nested parentheses collapse to the single unwrapped comparison */
+        self::assertEquals(
+            [Comparison::of(field: 'a', values: ['1'], operator: Operator::EQUAL)],
+            $comparisons
+        );
+    }
+
+    public function testFromQueryWhenFilterNestedBeyondTheMaximumDepthThenThrowsFilterExpressionIsInvalid(): void
+    {
+        /** @Given a filter template wrapping a comparison in placeholders */
+        $template = '%sa==1%s';
+
+        /** @And a query whose filter nests parentheses one level beyond the maximum depth */
+        $query = Query::from(parameters: [
+            'filter' => sprintf($template, str_repeat('(', 33), str_repeat(')', 33))
+        ]);
+
+        /** @Then an exception indicating the filter expression is invalid is raised */
+        $this->expectException(FilterExpressionIsInvalid::class);
+        $this->expectExceptionMessage('could not be parsed');
+
+        /** @When building the criteria from the query */
+        Criteria::fromQuery(request: $query, schema: $this->schema);
+    }
+
     public function testFromQueryWhenDateTimeValueMatchesKindThenComparisonIsReturned(): void
     {
         /** @Given a schema allowing a date-time field under the greater-than operator */
