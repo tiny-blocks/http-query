@@ -29,7 +29,7 @@ final class PageTest extends TestCase
     public function testNavigationWhenNoExtraElementThenHasNoNextPage(): void
     {
         /** @Given a keyset pagination with an absent incoming cursor and a page size of two */
-        $pagination = Pagination::from(perPage: 2, cursor: Token::none());
+        $pagination = Pagination::from(cursor: Token::none(), perPage: 2);
 
         /** @And a cursor page built from items fetched within the page size */
         $page = Page::from(
@@ -64,7 +64,7 @@ final class PageTest extends TestCase
             filter: $this->filter,
             items: [10, 20, 30],
             keysOf: static fn(int $element): array => [$element],
-            pagination: Pagination::from(perPage: 2, cursor: Token::from(token: $token))
+            pagination: Pagination::from(cursor: Token::from(token: $token), perPage: 2)
         );
 
         /** @When rendering the cursor page as a JSON:API response over the orders base URI */
@@ -98,7 +98,7 @@ final class PageTest extends TestCase
             filter: $this->filter,
             items: [10, 20, 30],
             keysOf: static fn(int $element): array => [$element],
-            pagination: Pagination::from(perPage: 2, cursor: Token::none())
+            pagination: Pagination::from(cursor: Token::none(), perPage: 2)
         );
 
         /** @When rendering the first cursor page as a JSON:API response over the orders base URI */
@@ -126,7 +126,7 @@ final class PageTest extends TestCase
             filter: $this->filter,
             items: [10, 20, 30],
             keysOf: static fn(int $element): array => [$element],
-            pagination: Pagination::from(perPage: 2, cursor: Token::none())
+            pagination: Pagination::from(cursor: Token::none(), perPage: 2)
         );
 
         /** @When reading the navigation targets */
@@ -138,7 +138,7 @@ final class PageTest extends TestCase
         /** @And the only target is the next target anchored on the forward cursor */
         self::assertEquals(
             NavigationTarget::to(
-                target: Pagination::from(perPage: 2, cursor: Token::fromKeys(keys: [20])),
+                target: Pagination::from(cursor: Token::fromKeys(keys: [20]), perPage: 2),
                 relation: LinkRelation::NEXT
             ),
             $targets->first()
@@ -153,7 +153,7 @@ final class PageTest extends TestCase
             filter: $this->filter,
             items: [10, 20, 30],
             keysOf: static fn(int $element): array => [$element],
-            pagination: Pagination::from(perPage: 2, cursor: Token::none())
+            pagination: Pagination::from(cursor: Token::none(), perPage: 2)
         );
 
         /** @When mapping the items through a projection */
@@ -166,7 +166,7 @@ final class PageTest extends TestCase
         self::assertTrue($mapped->hasNext());
 
         /** @And the next pagination still anchors on the source keys */
-        self::assertEquals(Pagination::from(perPage: 2, cursor: Token::fromKeys(keys: [20])), $mapped->next());
+        self::assertEquals(Pagination::from(cursor: Token::fromKeys(keys: [20]), perPage: 2), $mapped->next());
 
         /** @And the metadata is preserved in length-ascending key order */
         self::assertSame(['has_next' => true, 'per_page' => 2], $mapped->metadata());
@@ -183,7 +183,7 @@ final class PageTest extends TestCase
             filter: $this->filter,
             items: [['id' => 10], ['id' => 20], ['id' => 30]],
             keysOf: static fn(array $row): array => [$row['id']],
-            pagination: Pagination::from(perPage: 2, cursor: Token::from(token: $token))
+            pagination: Pagination::from(cursor: Token::from(token: $token), perPage: 2)
         )->map(transformation: static fn(array $row): int => (int)$row['id']);
 
         /** @When rendering the mapped cursor page as a JSON:API response over the orders base URI */
@@ -206,7 +206,7 @@ final class PageTest extends TestCase
     public function testNavigationWhenExtraElementFetchedThenHasNextAndNextCursorAnchorsLastItem(): void
     {
         /** @Given a keyset pagination with an absent incoming cursor and a page size of two */
-        $pagination = Pagination::from(perPage: 2, cursor: Token::none());
+        $pagination = Pagination::from(cursor: Token::none(), perPage: 2);
 
         /** @And a cursor page built over items fetched for the page size plus one */
         $page = Page::from(
@@ -224,7 +224,7 @@ final class PageTest extends TestCase
         self::assertSame([10, 20], $page->items()->toArray());
 
         /** @And the next pagination anchors on the last retained element with the page size */
-        self::assertEquals(Pagination::from(perPage: 2, cursor: Token::fromKeys(keys: [20])), $page->next());
+        self::assertEquals(Pagination::from(cursor: Token::fromKeys(keys: [20]), perPage: 2), $page->next());
 
         /** @And the metadata carries the navigation flags in length-ascending key order */
         self::assertSame(['has_next' => true, 'per_page' => 2], $page->metadata());

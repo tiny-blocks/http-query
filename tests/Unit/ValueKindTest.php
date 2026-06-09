@@ -6,6 +6,9 @@ namespace Test\TinyBlocks\HttpQuery\Unit;
 
 use PHPUnit\Framework\Attributes\DataProvider;
 use PHPUnit\Framework\TestCase;
+use ReflectionClass;
+use ReflectionMethod;
+use TinyBlocks\HttpQuery\Internal\Iso8601;
 use TinyBlocks\HttpQuery\ValueKind;
 
 final class ValueKindTest extends TestCase
@@ -32,6 +35,18 @@ final class ValueKindTest extends TestCase
 
         /** @Then it reports that the value does not match the kind */
         self::assertFalse($matches);
+    }
+
+    public function testConstructorWhenInvokedThroughReflectionThenInstantiatesTheStaticOnlyValidator(): void
+    {
+        /** @Given an uninitialized instance of the static-only ISO-8601 validator */
+        $validator = new ReflectionClass(Iso8601::class)->newInstanceWithoutConstructor();
+
+        /** @When invoking its otherwise-uncallable private constructor */
+        new ReflectionMethod(Iso8601::class, '__construct')->invoke($validator);
+
+        /** @Then the static-only ISO-8601 validator is instantiated */
+        self::assertInstanceOf(Iso8601::class, $validator);
     }
 
     public static function matchingValues(): array

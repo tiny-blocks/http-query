@@ -10,6 +10,7 @@ use ReflectionMethod;
 use Test\TinyBlocks\HttpQuery\Models\Query;
 use TinyBlocks\HttpQuery\Comparison;
 use TinyBlocks\HttpQuery\Group;
+use TinyBlocks\HttpQuery\Internal\Rsql\Renderer;
 use TinyBlocks\HttpQuery\Internal\Uri;
 use TinyBlocks\HttpQuery\Links;
 use TinyBlocks\HttpQuery\LogicalOperator;
@@ -358,5 +359,17 @@ final class LinksTest extends TestCase
 
         /** @Then the static-only URI assembler is instantiated */
         self::assertInstanceOf(Uri::class, $uri);
+    }
+
+    public function testConstructorWhenInvokedThroughReflectionThenInstantiatesTheStaticOnlyRenderer(): void
+    {
+        /** @Given an uninitialized instance of the static-only RSQL renderer */
+        $renderer = new ReflectionClass(Renderer::class)->newInstanceWithoutConstructor();
+
+        /** @When invoking its otherwise-uncallable private constructor */
+        new ReflectionMethod(Renderer::class, '__construct')->invoke($renderer);
+
+        /** @Then the static-only RSQL renderer is instantiated */
+        self::assertInstanceOf(Renderer::class, $renderer);
     }
 }

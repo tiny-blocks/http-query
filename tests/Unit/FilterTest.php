@@ -135,6 +135,66 @@ final class FilterTest extends TestCase
         );
     }
 
+    public function testFromQueryWhenEscapedQuoteInValueThenComparisonKeepsTheQuote(): void
+    {
+        /** @Given a query whose double-quoted value carries an escaped double quote */
+        $query = Query::from(parameters: ['filter' => 'name=="a\\"b"']);
+
+        /** @When reading the validated comparisons */
+        $comparisons = Criteria::fromQuery(request: $query, schema: $this->schema)->comparisons();
+
+        /** @Then the comparison carries the value with the escaped quote unescaped */
+        self::assertEquals(
+            [Comparison::of(field: 'name', values: ['a"b'], operator: Operator::EQUAL)],
+            $comparisons
+        );
+    }
+
+    public function testFromQueryWhenEscapedBackslashInValueThenComparisonKeepsTheBackslash(): void
+    {
+        /** @Given a query whose double-quoted value carries an escaped backslash */
+        $query = Query::from(parameters: ['filter' => 'name=="a\\\\b"']);
+
+        /** @When reading the validated comparisons */
+        $comparisons = Criteria::fromQuery(request: $query, schema: $this->schema)->comparisons();
+
+        /** @Then the comparison carries the value with the escaped backslash unescaped */
+        self::assertEquals(
+            [Comparison::of(field: 'name', values: ['a\\b'], operator: Operator::EQUAL)],
+            $comparisons
+        );
+    }
+
+    public function testFromQueryWhenParenthesizedComparisonThenComparisonIsReturned(): void
+    {
+        /** @Given a query wrapping a single comparison in parentheses */
+        $query = Query::from(parameters: ['filter' => '(status==paid)']);
+
+        /** @When reading the validated comparisons */
+        $comparisons = Criteria::fromQuery(request: $query, schema: $this->schema)->comparisons();
+
+        /** @Then the only comparison is the unwrapped equality */
+        self::assertEquals(
+            [Comparison::of(field: 'status', values: ['paid'], operator: Operator::EQUAL)],
+            $comparisons
+        );
+    }
+
+    public function testFromQueryWhenParenthesizedAndGroupThenComparisonsCarryEveryLeaf(): void
+    {
+        /** @Given a query wrapping an AND expression of two comparisons in parentheses */
+        $query = Query::from(parameters: ['filter' => '(a==1;b==2)']);
+
+        /** @When reading the validated comparisons */
+        $comparisons = Criteria::fromQuery(request: $query, schema: $this->schema)->comparisons();
+
+        /** @Then the comparisons carry both leaves in order */
+        self::assertEquals([
+            Comparison::of(field: 'a', values: ['1'], operator: Operator::EQUAL),
+            Comparison::of(field: 'b', values: ['2'], operator: Operator::EQUAL)
+        ], $comparisons);
+    }
+
     public function testFromQueryWhenDateTimeValueMatchesKindThenComparisonIsReturned(): void
     {
         /** @Given a schema allowing a date-time field under the greater-than operator */
@@ -334,12 +394,14 @@ final class FilterTest extends TestCase
         return [
             'No operator'              => ['expression' => 'status'],
             'Empty value'              => ['expression' => 'status=='],
+            'Backslash at the end'     => ['expression' => 'name=="a\\'],
             'Unclosed group'           => ['expression' => '(status==paid'],
             'Trailing semicolon'       => ['expression' => 'status==paid;'],
             'Unknown operator'         => ['expression' => 'status=zz=paid'],
-            'Group missing close mark' => ['expression' => '(a==1 '],
+            'Whitespace after value'   => ['expression' => 'a==b c'],
             'Trailing close mark'      => ['expression' => 'a==1)'],
-            'Unclosed quoted value'    => ['expression' => 'name=="x']
+            'Unclosed quoted value'    => ['expression' => 'name=="x'],
+            'Group missing close mark' => ['expression' => '(a==1 ']
         ];
     }
 }

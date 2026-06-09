@@ -5,12 +5,15 @@ declare(strict_types=1);
 namespace Test\TinyBlocks\HttpQuery\Unit\Cursor;
 
 use PHPUnit\Framework\TestCase;
+use ReflectionClass;
+use ReflectionMethod;
 use Test\TinyBlocks\HttpQuery\Models\Query;
 use TinyBlocks\HttpQuery\Cursor\Criteria;
 use TinyBlocks\HttpQuery\Cursor\Pagination;
 use TinyBlocks\HttpQuery\Cursor\Token;
 use TinyBlocks\HttpQuery\Direction;
 use TinyBlocks\HttpQuery\Exceptions\CursorIsInvalid;
+use TinyBlocks\HttpQuery\Internal\Cursor\SortKeys;
 use TinyBlocks\HttpQuery\Order;
 use TinyBlocks\HttpQuery\Schema;
 
@@ -66,7 +69,7 @@ final class KeysetTest extends TestCase
         self::assertSame([10, 20], $page->items()->toArray());
 
         /** @And the next pagination anchors on the keys extracted from the last retained element */
-        self::assertEquals(Pagination::from(perPage: 2, cursor: Token::fromKeys(keys: [20])), $page->next());
+        self::assertEquals(Pagination::from(cursor: Token::fromKeys(keys: [20]), perPage: 2), $page->next());
     }
 
     public function testPageWhenNoKeysOfGivenThenDerivesKeysFromTheSortFields(): void
@@ -84,7 +87,7 @@ final class KeysetTest extends TestCase
         self::assertSame([['id' => 10], ['id' => 20]], $page->items()->toArray());
 
         /** @And the next pagination anchors on the sort-field keys of the last retained row */
-        self::assertEquals(Pagination::from(perPage: 2, cursor: Token::fromKeys(keys: [20])), $page->next());
+        self::assertEquals(Pagination::from(cursor: Token::fromKeys(keys: [20]), perPage: 2), $page->next());
     }
 
     public function testCursorWhenNoIncomingCursorThenEverySortFieldIsNull(): void
@@ -140,5 +143,17 @@ final class KeysetTest extends TestCase
 
         /** @When reading the incoming cursor key values */
         $keyset->cursor();
+    }
+
+    public function testConstructorWhenInvokedThroughReflectionThenInstantiatesTheStaticOnlySortKeys(): void
+    {
+        /** @Given an uninitialized instance of the static-only sort-key extractor */
+        $extractor = new ReflectionClass(SortKeys::class)->newInstanceWithoutConstructor();
+
+        /** @When invoking its otherwise-uncallable private constructor */
+        new ReflectionMethod(SortKeys::class, '__construct')->invoke($extractor);
+
+        /** @Then the static-only sort-key extractor is instantiated */
+        self::assertInstanceOf(SortKeys::class, $extractor);
     }
 }

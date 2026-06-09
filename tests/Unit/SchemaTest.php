@@ -5,7 +5,10 @@ declare(strict_types=1);
 namespace Test\TinyBlocks\HttpQuery\Unit;
 
 use PHPUnit\Framework\TestCase;
+use ReflectionClass;
+use ReflectionMethod;
 use TinyBlocks\HttpQuery\Exceptions\PageSizeOutOfRange;
+use TinyBlocks\HttpQuery\Internal\Conjunction;
 use TinyBlocks\HttpQuery\Schema;
 
 final class SchemaTest extends TestCase
@@ -144,5 +147,17 @@ final class SchemaTest extends TestCase
 
         /** @When lowering the default page size below the minimum */
         $schema->defaultPerPage(defaultPerPage: 0);
+    }
+
+    public function testConstructorWhenInvokedThroughReflectionThenInstantiatesTheStaticOnlyConjunction(): void
+    {
+        /** @Given an uninitialized instance of the static-only conjunction flattener */
+        $flattener = new ReflectionClass(Conjunction::class)->newInstanceWithoutConstructor();
+
+        /** @When invoking its otherwise-uncallable private constructor */
+        new ReflectionMethod(Conjunction::class, '__construct')->invoke($flattener);
+
+        /** @Then the static-only conjunction flattener is instantiated */
+        self::assertInstanceOf(Conjunction::class, $flattener);
     }
 }
