@@ -167,7 +167,7 @@ final class PageTest extends TestCase
         /** @When building the page from the total element count */
         $page = $criteria->page(total: 480, items: ['a', 'b']);
 
-        /** @Then the metadata carries every navigation flag and count in length-ascending key order */
+        /** @Then the metadata carries every entry in grouped key order (counts and sizes, then the boolean flags) */
         self::assertSame([
             'total'        => 480,
             'per_page'     => 20,

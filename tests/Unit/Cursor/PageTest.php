@@ -49,7 +49,7 @@ final class PageTest extends TestCase
         /** @And the navigation lists no target */
         self::assertCount(0, $page->navigation()->targets()->toArray());
 
-        /** @And the metadata reports no next page in length-ascending key order */
+        /** @And the metadata reports no next page in grouped key order (counts and sizes, then the boolean flags) */
         self::assertSame(['per_page' => 2, 'has_next' => false], $page->metadata());
     }
 
@@ -168,7 +168,7 @@ final class PageTest extends TestCase
         /** @And the next pagination still anchors on the source keys */
         self::assertEquals(Pagination::from(cursor: Token::fromKeys(keys: [20]), perPage: 2), $mapped->next());
 
-        /** @And the metadata is preserved in length-ascending key order */
+        /** @And the metadata is preserved in grouped key order (counts and sizes, then the boolean flags) */
         self::assertSame(['per_page' => 2, 'has_next' => true], $mapped->metadata());
     }
 
@@ -226,7 +226,7 @@ final class PageTest extends TestCase
         /** @And the next pagination anchors on the last retained element with the page size */
         self::assertEquals(Pagination::from(cursor: Token::fromKeys(keys: [20]), perPage: 2), $page->next());
 
-        /** @And the metadata carries the navigation flags in length-ascending key order */
+        /** @And the metadata carries every entry in grouped key order (counts and sizes, then the boolean flags) */
         self::assertSame(['per_page' => 2, 'has_next' => true], $page->metadata());
     }
 }

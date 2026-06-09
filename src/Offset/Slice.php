@@ -117,7 +117,8 @@ final readonly class Slice
     /**
      * Returns the slice as the JSON:API meta contents.
      *
-     * @return array<string, int|bool> The meta contents keyed in length-ascending order.
+     * @return array<string, int|bool> The meta contents, counts and sizes first, then the boolean
+     * flags, each by ascending key-name length.
      */
     public function metadata(): array
     {

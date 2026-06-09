@@ -92,7 +92,7 @@ final class SliceTest extends TestCase
         /** @And the previous pagination points at the first page */
         self::assertSame(1, $slice->previous()?->page());
 
-        /** @And the metadata carries every navigation flag and count in length-ascending key order */
+        /** @And the metadata carries every entry in grouped key order (counts and sizes, then the boolean flags) */
         self::assertSame([
             'per_page'     => 3,
             'current_page' => 2,
