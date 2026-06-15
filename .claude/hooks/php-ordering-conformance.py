@@ -5,12 +5,14 @@ Self-contained PostToolUse hook on Edit|Write|MultiEdit. Verifies the determinis
 ordering conventions for PHP declarations:
 
 - Parameter ordering: declaration parameters (constructors, factories, methods,
-  property promotion) ordered by identifier length ascending, alphabetical
-  tie-breaker, semantic pairs preserved.
-- Parameter ordering: named arguments at call sites, same comparator.
+  property promotion) in three tiers, required parameters first, then defaulted
+  parameters, then a variadic, each tier by identifier length ascending,
+  alphabetical tie-breaker, semantic pairs preserved. A PHPUnit test method fed by
+  a data provider is exempt, its parameters are the columns of its data set.
 - Member ordering: constants, enum cases, constructor, static methods, instance
   methods, in that group order, each group length-ascending with alphabetical
-  tie-breaker.
+  tie-breaker. PHPUnit test classes instead order methods as lifecycle hooks (in
+  execution order), then other methods, then data providers.
 
 The analysis is pure (FileUnit in, Violation out) and runs in three passes over
 well-formed PHP: a lexical pass blanks every comment, string, and heredoc/nowdoc
@@ -85,7 +87,20 @@ CONST_LINE: Final = re.compile(
 CASE_LINE: Final = re.compile(r"^\s*case\s+(\w+)\s*[=;]")
 
 PARAMETER: Final = re.compile(r"\$(\w+)")
-NAMED_ARGUMENT: Final = re.compile(r"[(,]\s*(\w+):(?!:)")
+VARIADIC: Final = re.compile(r"\.\.\.\s*\$")
+# A default assignment is a lone `=`, never `=>` in an array or arrow function,
+# never a comparison (`==`, `!=`, `<=`, `>=`).
+DEFAULT_ASSIGNMENT: Final = re.compile(r"(?<![=!<>])=(?![=>])")
+
+# PHPUnit lifecycle hooks in fixed execution order, with detection patterns for a
+# test class and for the data providers its methods reference.
+LIFECYCLE_ORDER: Final = ("setUpBeforeClass", "setUp", "tearDown", "tearDownAfterClass")
+LIFECYCLE_HOOKS: Final = frozenset(LIFECYCLE_ORDER)
+EXTENDS_TESTCASE: Final = re.compile(r"\bextends\s+\\?(?:\w+\\)*TestCase\b")
+DATA_PROVIDER_REFERENCE: Final = re.compile(
+    r"#\[\s*(?:\\?\w+\\)*DataProvider\s*\(\s*['\"](\w+)['\"]"
+    r"|@dataProvider\s+(\w+)"
+)
 
 MAX_ERRORS_REPORTED = 30
 
@@ -160,23 +175,28 @@ class Ordering:
                 return (len(first), first, position)
         return (len(name), name, 0)
 
-    def violated_by(self, names: list[str]) -> bool:
-        """Whether the names break the required order."""
-        return names != self.sorted(names)
-
 
 PARAMETER_ORDERING: Final = Ordering(pair_member=PAIR_MEMBER)
 MEMBER_ORDERING: Final = Ordering(pair_member={})
 
 
 class MemberKind(Enum):
-    """Closed set of class-member groups in required declaration order."""
+    """Closed set of class-member groups in required declaration order.
+
+    Ranks 0 to 4 are the production families. A PHPUnit test class keeps the
+    const, case, constructor ranks then draws its methods from the test families
+    (5 to 7): lifecycle hooks, other methods, data providers. A class draws its
+    methods from one family set or the other, never both, so ranks stay monotonic.
+    """
 
     CONSTANT = (0, "const")
     CASE = (1, "case")
     CONSTRUCTOR = (2, "constructor")
     STATIC_METHOD = (3, "static method")
     INSTANCE_METHOD = (4, "instance method")
+    LIFECYCLE = (5, "lifecycle hook")
+    METHOD = (6, "method")
+    DATA_PROVIDER = (7, "data provider")
 
     @property
     def rank(self) -> int:
@@ -205,42 +225,46 @@ class TypeMembers:
     """The members of one class-like declaration in source order."""
 
     name: str
+    is_test: bool
     members: list[Member]
+
+
+# Parameter ordering tiers: required first, then defaulted, then a variadic.
+REQUIRED_TIER: Final = 0
+DEFAULT_TIER: Final = 1
+VARIADIC_TIER: Final = 2
+
+
+@dataclass(frozen=True)
+class Parameter:
+    """One declared parameter: its identifier and its ordering tier."""
+
+    name: str
+    tier: int
 
 
 @dataclass(frozen=True)
 class ParameterList:
-    """One declaration's parameter identifiers in source order."""
+    """One declaration's parameters in source order."""
 
     line: int
-    names: list[str]
     owner: str
+    params: list[Parameter]
+
+    @property
+    def names(self) -> list[str]:
+        return [parameter.name for parameter in self.params]
+
+    def in_tier(self, tier: int) -> list[str]:
+        return [parameter.name for parameter in self.params if parameter.tier == tier]
 
     def required(self) -> list[str]:
-        return PARAMETER_ORDERING.sorted(self.names)
+        ordered = PARAMETER_ORDERING.sorted(self.in_tier(REQUIRED_TIER))
+        ordered += PARAMETER_ORDERING.sorted(self.in_tier(DEFAULT_TIER))
+        return ordered + self.in_tier(VARIADIC_TIER)
 
     def out_of_order(self) -> bool:
-        return len(self.names) >= 2 and PARAMETER_ORDERING.violated_by(self.names)
-
-
-@dataclass
-class ArgumentGroup:
-    """The named arguments collected inside one parenthesized list."""
-
-    names: list[tuple[str, int]]
-
-    def required(self) -> list[str]:
-        return PARAMETER_ORDERING.sorted(self.identifiers())
-
-    def opened_at(self) -> int:
-        return self.names[0][1]
-
-    def identifiers(self) -> list[str]:
-        return [name for name, _ in self.names]
-
-    def out_of_order(self) -> bool:
-        identifiers = self.identifiers()
-        return len(identifiers) >= 2 and PARAMETER_ORDERING.violated_by(identifiers)
+        return len(self.params) >= 2 and self.names != self.required()
 
 
 # --- Structure ----------------------------------------------------------------
@@ -289,81 +313,116 @@ def top_level_pieces(text: str) -> list[str]:
 
 
 def declared_signatures(source: Source) -> list[ParameterList]:
-    """Every function or method declaration with its parameter identifiers."""
+    """Every function or method declaration with its parameters."""
     signatures = []
     spans = bracket_spans(source.clean)
 
     for match in FUNCTION_DECLARATION.finditer(source.clean):
         open_paren = source.clean.index("(", match.end() - 1)
         inner = source.clean[open_paren + 1: spans.get(open_paren, len(source.clean))]
-        names = [
-            found[-1]
+        params = [
+            parameter_of(piece)
             for piece in top_level_pieces(inner)
-            if (found := PARAMETER.findall(piece))
+            if PARAMETER.search(piece)
         ]
 
         signatures.append(ParameterList(
             line=source.line_of(match.start()),
-            names=names,
             owner=match.group(1),
+            params=params,
         ))
     return signatures
 
 
-def named_argument_groups(source: Source) -> list[ArgumentGroup]:
-    """Every parenthesized list with the named arguments it carries."""
-    arguments = {match.start(1): match.group(1) for match in NAMED_ARGUMENT.finditer(source.clean)}
-    groups: list[ArgumentGroup] = []
-    stack: list[ArgumentGroup] = []
+def parameter_of(piece: str) -> Parameter:
+    """One parameter's identifier and ordering tier from its declaration piece."""
+    name = PARAMETER.findall(piece)[-1]
 
-    for position, character in enumerate(source.clean):
-        if character == "(":
-            stack.append(ArgumentGroup(names=[]))
+    if VARIADIC.search(piece):
+        return Parameter(name=name, tier=VARIADIC_TIER)
 
-        if character == ")" and stack:
-            groups.append(stack.pop())
-
-        if position in arguments and stack:
-            stack[-1].names.append((arguments[position], source.line_of(position)))
-    return groups
+    if DEFAULT_ASSIGNMENT.search(piece):
+        return Parameter(name=name, tier=DEFAULT_TIER)
+    return Parameter(name=name, tier=REQUIRED_TIER)
 
 
-def class_members(source: Source) -> list[TypeMembers]:
+def class_members(unit: FileUnit) -> list[TypeMembers]:
     """Every class-like declaration with its members in source order."""
     declarations = []
-    spans = bracket_spans(source.clean)
+    clean = unit.source.clean
+    spans = bracket_spans(clean)
 
-    for type_match in TYPE_DECLARATION.finditer(source.clean):
-        body_open = source.clean.find("{", type_match.end())
+    for type_match in TYPE_DECLARATION.finditer(clean):
+        body_open = clean.find("{", type_match.end())
 
         if body_open == -1:
             continue
 
-        body = source.clean[body_open + 1: spans.get(body_open, len(source.clean))]
+        body_close = spans.get(body_open, len(clean))
+        is_test = bool(EXTENDS_TESTCASE.search(clean[type_match.end(): body_open]))
+        providers = test_providers(unit.text[body_open + 1: body_close]) if is_test else set()
         declarations.append(TypeMembers(
             name=type_match.group(2),
-            members=declared_members(body=body, at_line=source.line_of(body_open)),
+            is_test=is_test,
+            members=declared_members(
+                at_line=unit.source.line_of(body_open),
+                body=clean[body_open + 1: body_close],
+                is_test=is_test,
+                providers=providers,
+            ),
         ))
     return declarations
 
 
-def declared_members(body: str, at_line: int) -> list[Member]:
+def test_providers(raw_body: str) -> set[str]:
+    """Every method name a data-provider attribute or annotation references."""
+    names = set()
+    for match in DATA_PROVIDER_REFERENCE.finditer(raw_body):
+        names.add(match.group(1) or match.group(2))
+    return names
+
+
+def provider_consumer_lines(unit: FileUnit) -> set[int]:
+    """Declaration lines of the test methods a data provider feeds.
+
+    The consumer side of the data-provider relation: the method a
+    `#[DataProvider('name')]` attribute or `@dataProvider name` tag immediately
+    precedes. Its parameters are the columns of the data set, ordered by the data
+    rather than by name length, so the parameter check skips these lines. Detection
+    runs on the raw text, since the docblock form is blanked in the Source, then the
+    next declaration in the position-aligned Source fixes the line.
+    """
+    clean = unit.source.clean
+    lines = set()
+    for reference in DATA_PROVIDER_REFERENCE.finditer(unit.text):
+        method = FUNCTION_DECLARATION.search(clean, reference.end())
+        if not method:
+            continue
+        lines.add(unit.source.line_of(method.start()))
+    return lines
+
+
+def declared_members(at_line: int, body: str, is_test: bool, providers: set[str]) -> list[Member]:
     """The members declared at the top level of one type body."""
     members, depth = [], 0
     for offset, line in enumerate(body.split("\n")):
-        if depth == 0 and (member := classified(at=at_line + offset, line=line)):
+        member = classified(at=at_line + offset, line=line, is_test=is_test, providers=providers)
+        if depth == 0 and member:
             members.append(member)
         depth += line.count("{") - line.count("}")
     return members
 
 
-def classified(at: int, line: str) -> Member | None:
+def classified(at: int, line: str, is_test: bool, providers: set[str]) -> Member | None:
     """The member a line declares, when it declares one."""
     method = METHOD_LINE.match(line)
     if method:
         name = method.group(2)
         if name == "__construct":
             return Member(kind=MemberKind.CONSTRUCTOR, line=at, name=name)
+
+        if is_test:
+            return Member(kind=test_method_kind(name=name, providers=providers), line=at, name=name)
 
         if "static" in method.group(1).split():
             return Member(kind=MemberKind.STATIC_METHOD, line=at, name=name)
@@ -380,11 +439,22 @@ def classified(at: int, line: str) -> Member | None:
     return None
 
 
+def test_method_kind(name: str, providers: set[str]) -> MemberKind:
+    """The method family a name takes inside a PHPUnit test class."""
+    if name in LIFECYCLE_HOOKS:
+        return MemberKind.LIFECYCLE
+
+    if name in providers:
+        return MemberKind.DATA_PROVIDER
+    return MemberKind.METHOD
+
+
 # --- Checks -------------------------------------------------------------------
 
 
 def parameter_violations(unit: FileUnit) -> tuple[Violation, ...]:
-    """Parameter ordering on every function and method declaration."""
+    """Parameter ordering on every declaration a data provider does not feed."""
+    exempt = provider_consumer_lines(unit)
     return tuple(
         Violation(
             line=signature.line,
@@ -397,31 +467,14 @@ def parameter_violations(unit: FileUnit) -> tuple[Violation, ...]:
         )
 
         for signature in declared_signatures(unit.source)
-        if signature.out_of_order()
-    )
-
-
-def named_argument_violations(unit: FileUnit) -> tuple[Violation, ...]:
-    """Parameter ordering on named arguments at call sites."""
-    return tuple(
-        Violation(
-            line=group.opened_at(),
-            path=unit.path,
-            message=(
-                f"named-argument order is ({', '.join(group.identifiers())}), "
-                f"required ({', '.join(group.required())})"
-            ),
-        )
-
-        for group in named_argument_groups(unit.source)
-        if group.out_of_order()
+        if signature.line not in exempt and signature.out_of_order()
     )
 
 
 def member_violations(unit: FileUnit) -> tuple[Violation, ...]:
     """Member ordering on group sequence and order within each group."""
     violations: list[Violation] = []
-    for declared in class_members(unit.source):
+    for declared in class_members(unit):
         violations.extend(group_sequence_violations(path=unit.path, declared=declared))
         violations.extend(within_group_violations(path=unit.path, declared=declared))
     return tuple(violations)
@@ -430,6 +483,7 @@ def member_violations(unit: FileUnit) -> tuple[Violation, ...]:
 def group_sequence_violations(path: str, declared: TypeMembers) -> tuple[Violation, ...]:
     """Members declared after a group that must come later."""
     violations = []
+    order = group_order_text(declared.is_test)
     latest = MemberKind.CONSTANT
     for member in declared.members:
         if member.kind.precedes(latest):
@@ -438,8 +492,7 @@ def group_sequence_violations(path: str, declared: TypeMembers) -> tuple[Violati
                 path=path,
                 message=(
                     f"`{member.name}` ({member.kind.label}) declared after a later "
-                    f"group in `{declared.name}`, required group order const, case, "
-                    f"constructor, static methods, instance methods"
+                    f"group in `{declared.name}`, required group order {order}"
                 ),
             ))
 
@@ -448,8 +501,15 @@ def group_sequence_violations(path: str, declared: TypeMembers) -> tuple[Violati
     return tuple(violations)
 
 
+def group_order_text(is_test: bool) -> str:
+    """The required group-order clause for the production or the test layout."""
+    if is_test:
+        return "const, case, constructor, lifecycle hooks, methods, data providers"
+    return "const, case, constructor, static methods, instance methods"
+
+
 def within_group_violations(path: str, declared: TypeMembers) -> tuple[Violation, ...]:
-    """Groups whose members break the length-then-alphabet order."""
+    """Groups whose members break their required intra-group order."""
     violations = []
     for kind in MemberKind:
         if kind is MemberKind.CONSTRUCTOR:
@@ -457,7 +517,11 @@ def within_group_violations(path: str, declared: TypeMembers) -> tuple[Violation
         grouped = [member for member in declared.members if member.kind is kind]
         names = [member.name for member in grouped]
 
-        if not names or not MEMBER_ORDERING.violated_by(names):
+        if not names:
+            continue
+        required = required_within(kind=kind, names=names)
+
+        if names == required:
             continue
 
         violations.append(Violation(
@@ -465,17 +529,23 @@ def within_group_violations(path: str, declared: TypeMembers) -> tuple[Violation
             path=path,
             message=(
                 f"{kind.label} order in `{declared.name}` is ({', '.join(names)}), "
-                f"required ({', '.join(MEMBER_ORDERING.sorted(names))})"
+                f"required ({', '.join(required)})"
             ),
         ))
     return tuple(violations)
 
 
+def required_within(kind: MemberKind, names: list[str]) -> list[str]:
+    """One group's required order, lifecycle hooks by execution order, else length then alphabet."""
+    if kind is MemberKind.LIFECYCLE:
+        return [hook for hook in LIFECYCLE_ORDER if hook in names]
+    return MEMBER_ORDERING.sorted(names)
+
+
 def ordering_violations(unit: FileUnit) -> tuple[Violation, ...]:
-    """Every ordering violation in one PHP file: members, named arguments, parameters."""
+    """Every ordering violation in one PHP file: members, parameters."""
     return (
         *member_violations(unit),
-        *named_argument_violations(unit),
         *parameter_violations(unit),
     )
 
