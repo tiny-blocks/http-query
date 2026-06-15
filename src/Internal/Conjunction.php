@@ -25,6 +25,15 @@ final class Conjunction
         return [$filter];
     }
 
+    private static function leaf(Filter $filter, string $expression): Comparison
+    {
+        if ($filter instanceof Comparison) {
+            return $filter;
+        }
+
+        throw FilterShapeNotSupported::from(expression: $expression);
+    }
+
     private static function flatten(Group $group, string $expression): array
     {
         if ($group->operator() !== LogicalOperator::AND) {
@@ -35,14 +44,5 @@ final class Conjunction
             static fn(Filter $filter): Comparison => Conjunction::leaf(filter: $filter, expression: $expression),
             $group->filters()
         );
-    }
-
-    private static function leaf(Filter $filter, string $expression): Comparison
-    {
-        if ($filter instanceof Comparison) {
-            return $filter;
-        }
-
-        throw FilterShapeNotSupported::from(expression: $expression);
     }
 }

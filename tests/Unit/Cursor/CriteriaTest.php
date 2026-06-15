@@ -42,19 +42,6 @@ final class CriteriaTest extends TestCase
         self::assertSame([], $criteria->comparisons());
     }
 
-    public function testKeysetWhenEffectiveSortIsEmptyThenThrowsSortIsRequired(): void
-    {
-        /** @Given a criteria parsed from a request carrying no sort and no schema default */
-        $criteria = Criteria::fromQuery(request: Query::from(parameters: []));
-
-        /** @Then an exception indicating a deterministic order is required is raised */
-        $this->expectException(SortIsRequired::class);
-        $this->expectExceptionMessage('A keyset requires a deterministic order, but the effective sort is empty.');
-
-        /** @When building the keyset view */
-        $criteria->keyset();
-    }
-
     public function testKeysetWhenBuiltWithoutCursorThenBuildsCursorPage(): void
     {
         /** @Given a schema declaring a default sort over the identifier */
@@ -97,6 +84,33 @@ final class CriteriaTest extends TestCase
         self::assertSame([10, 20], $page->items()->toArray());
     }
 
+    public function testKeysetWhenEffectiveSortIsEmptyThenThrowsSortIsRequired(): void
+    {
+        /** @Given a criteria parsed from a request carrying no sort and no schema default */
+        $criteria = Criteria::fromQuery(request: Query::from(parameters: []));
+
+        /** @Then an exception indicating a deterministic order is required is raised */
+        $this->expectException(SortIsRequired::class);
+        $this->expectExceptionMessage('A keyset requires a deterministic order, but the effective sort is empty.');
+
+        /** @When building the keyset view */
+        $criteria->keyset();
+    }
+
+    public function testFromQueryWhenCustomSchemaGivenThenAppliesItsDefaultPageSize(): void
+    {
+        /** @Given a schema lowering the default page size and declaring a default sort */
+        $schema = Schema::create()
+            ->defaultPerPage(defaultPerPage: 5)
+            ->defaultSort(sort: Sort::fromExpression(expression: 'id'));
+
+        /** @When building the keyset view from a query carrying no page size and the schema */
+        $keyset = Criteria::fromQuery(request: Query::from(parameters: []), schema: $schema)->keyset();
+
+        /** @Then the keyset carries the schema default page size */
+        self::assertSame(5, $keyset->limit());
+    }
+
     public function testFromQueryWhenCursorPresentThenKeysetCarriesPageSizeAndCursor(): void
     {
         /** @Given an opaque token produced from a single ordering key value */
@@ -121,18 +135,17 @@ final class CriteriaTest extends TestCase
         self::assertSame(['id' => 5], $keyset->cursor());
     }
 
-    public function testFromQueryWhenCustomSchemaGivenThenAppliesItsDefaultPageSize(): void
+    public function testFromQueryWhenPerPageAboveMaximumThenThrowsPageSizeOutOfRange(): void
     {
-        /** @Given a schema lowering the default page size and declaring a default sort */
-        $schema = Schema::create()
-            ->defaultPerPage(defaultPerPage: 5)
-            ->defaultSort(sort: Sort::fromExpression(expression: 'id'));
+        /** @Given query parameters carrying a page size above the default maximum */
+        $query = Query::from(parameters: ['page' => ['size' => '500']]);
 
-        /** @When building the keyset view from a query carrying no page size and the schema */
-        $keyset = Criteria::fromQuery(request: Query::from(parameters: []), schema: $schema)->keyset();
+        /** @Then an exception indicating the page size is out of range is raised */
+        $this->expectException(PageSizeOutOfRange::class);
+        $this->expectExceptionMessage('Page size');
 
-        /** @Then the keyset carries the schema default page size */
-        self::assertSame(5, $keyset->limit());
+        /** @When building the criteria from the query */
+        Criteria::fromQuery(request: $query);
     }
 
     public function testFromQueryWhenFilterAndSortGivenThenEachSpecificationIsValidated(): void
@@ -156,18 +169,5 @@ final class CriteriaTest extends TestCase
 
         /** @And the effective sort is the client sort */
         self::assertEquals(Sort::fromExpression(expression: '-created_at'), $criteria->sort());
-    }
-
-    public function testFromQueryWhenPerPageAboveMaximumThenThrowsPageSizeOutOfRange(): void
-    {
-        /** @Given query parameters carrying a page size above the default maximum */
-        $query = Query::from(parameters: ['page' => ['size' => '500']]);
-
-        /** @Then an exception indicating the page size is out of range is raised */
-        $this->expectException(PageSizeOutOfRange::class);
-        $this->expectExceptionMessage('Page size');
-
-        /** @When building the criteria from the query */
-        Criteria::fromQuery(request: $query);
     }
 }

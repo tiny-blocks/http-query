@@ -15,6 +15,6 @@ final class Query
 
     public static function from(array $parameters): ServerRequestInterface
     {
-        return new ServerRequest(method: 'GET', uri: '/')->withQueryParams($parameters);
+        return new ServerRequest(uri: '/', method: 'GET')->withQueryParams($parameters);
     }
 }

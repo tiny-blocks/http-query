@@ -37,42 +37,6 @@ final class SchemaTest extends TestCase
         self::assertSame(20, $actual);
     }
 
-    public function testPageSizeForWhenAtMaximumThenReturnsTheMaximumSize(): void
-    {
-        /** @Given the default schema */
-        $schema = Schema::default();
-
-        /** @When asking for a page size equal to the maximum */
-        $actual = $schema->pageSizeFor(requested: 100);
-
-        /** @Then it returns the maximum page size */
-        self::assertSame(100, $actual);
-    }
-
-    public function testPageSizeForWhenWithinMaximumThenReturnsTheRequestedSize(): void
-    {
-        /** @Given the default schema */
-        $schema = Schema::default();
-
-        /** @When asking for a page size within the maximum */
-        $actual = $schema->pageSizeFor(requested: 50);
-
-        /** @Then it returns the requested page size */
-        self::assertSame(50, $actual);
-    }
-
-    public function testMaxPerPageWhenRaisedThenTheCopyAcceptsTheLargerSize(): void
-    {
-        /** @Given the default schema */
-        $schema = Schema::default();
-
-        /** @When raising the maximum page size and asking for the larger size */
-        $actual = $schema->maxPerPage(maxPerPage: 250)->pageSizeFor(requested: 250);
-
-        /** @Then the larger size is accepted */
-        self::assertSame(250, $actual);
-    }
-
     public function testDefaultPerPageWhenLoweredThenTheCopyAppliesIt(): void
     {
         /** @Given the default schema */
@@ -97,17 +61,28 @@ final class SchemaTest extends TestCase
         self::assertSame(1, $actual);
     }
 
-    public function testPageSizeForWhenAboveMaximumThenThrowsPageSizeOutOfRange(): void
+    public function testPageSizeForWhenAtMaximumThenReturnsTheMaximumSize(): void
     {
         /** @Given the default schema */
         $schema = Schema::default();
 
-        /** @Then an exception indicating the page size is out of range is raised */
-        $this->expectException(PageSizeOutOfRange::class);
-        $this->expectExceptionMessage('Page size <101> must be less than or equal to 100.');
+        /** @When asking for a page size equal to the maximum */
+        $actual = $schema->pageSizeFor(requested: 100);
 
-        /** @When asking for a page size above the maximum */
-        $schema->pageSizeFor(requested: 101);
+        /** @Then it returns the maximum page size */
+        self::assertSame(100, $actual);
+    }
+
+    public function testMaxPerPageWhenRaisedThenTheCopyAcceptsTheLargerSize(): void
+    {
+        /** @Given the default schema */
+        $schema = Schema::default();
+
+        /** @When raising the maximum page size and asking for the larger size */
+        $actual = $schema->maxPerPage(maxPerPage: 250)->pageSizeFor(requested: 250);
+
+        /** @Then the larger size is accepted */
+        self::assertSame(250, $actual);
     }
 
     public function testMaxPerPageWhenBelowMinimumThenThrowsPageSizeOutOfRange(): void
@@ -121,6 +96,31 @@ final class SchemaTest extends TestCase
 
         /** @When lowering the maximum page size below the minimum */
         $schema->maxPerPage(maxPerPage: 0);
+    }
+
+    public function testPageSizeForWhenAboveMaximumThenThrowsPageSizeOutOfRange(): void
+    {
+        /** @Given the default schema */
+        $schema = Schema::default();
+
+        /** @Then an exception indicating the page size is out of range is raised */
+        $this->expectException(PageSizeOutOfRange::class);
+        $this->expectExceptionMessage('Page size <101> must be less than or equal to 100.');
+
+        /** @When asking for a page size above the maximum */
+        $schema->pageSizeFor(requested: 101);
+    }
+
+    public function testPageSizeForWhenWithinMaximumThenReturnsTheRequestedSize(): void
+    {
+        /** @Given the default schema */
+        $schema = Schema::default();
+
+        /** @When asking for a page size within the maximum */
+        $actual = $schema->pageSizeFor(requested: 50);
+
+        /** @Then it returns the requested page size */
+        self::assertSame(50, $actual);
     }
 
     public function testDefaultPerPageWhenAboveMaximumThenThrowsPageSizeOutOfRange(): void

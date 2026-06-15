@@ -29,6 +29,6 @@ final readonly class Total
 
     public function pageCount(Limit $limit): PageCount
     {
-        return PageCount::from(total: $this, limit: $limit);
+        return PageCount::from(limit: $limit, total: $this);
     }
 }

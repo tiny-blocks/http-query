@@ -67,30 +67,6 @@ final class TokenTest extends TestCase
         self::assertSame('', $token->toString());
     }
 
-    public function testFromKeysWhenKeysGivenThenDecodesToTheSameKeys(): void
-    {
-        /** @Given a token backed by ordering key values */
-        $token = Token::fromKeys(keys: ['2024-01-01', 42]);
-
-        /** @When decoding the token into key values */
-        $keys = $token->toArray();
-
-        /** @Then it yields the original key values */
-        self::assertSame(['2024-01-01', 42], $keys);
-    }
-
-    public function testFromKeysWhenKeysAreGappedThenDecodesToAReindexedList(): void
-    {
-        /** @Given a token backed by ordering key values held under gapped integer keys */
-        $token = Token::fromKeys(keys: [5 => 'x', 9 => 'y']);
-
-        /** @When decoding the token into key values */
-        $keys = $token->toArray();
-
-        /** @Then it yields the values as a zero-based list */
-        self::assertSame(['x', 'y'], $keys);
-    }
-
     public function testKeyedByWhenTokenAbsentThenEveryFieldIsNull(): void
     {
         /** @Given an absent token */
@@ -101,6 +77,18 @@ final class TokenTest extends TestCase
 
         /** @Then every field is present with a null value */
         self::assertSame(['created_at' => null, 'id' => null], $keyed);
+    }
+
+    public function testFromKeysWhenKeysGivenThenDecodesToTheSameKeys(): void
+    {
+        /** @Given a token backed by ordering key values */
+        $token = Token::fromKeys(keys: ['2024-01-01', 42]);
+
+        /** @When decoding the token into key values */
+        $keys = $token->toArray();
+
+        /** @Then it yields the original key values */
+        self::assertSame(['2024-01-01', 42], $keys);
     }
 
     public function testKeyedByWhenKeysPresentThenValuesAreKeyedByField(): void
@@ -115,6 +103,18 @@ final class TokenTest extends TestCase
         self::assertSame(['created_at' => '2024-01-01', 'id' => 42], $keyed);
     }
 
+    public function testFromKeysWhenEncodedThenTokenIsUrlSafeAndUnpadded(): void
+    {
+        /** @Given a token backed by key values whose base64 payload carries plus, slash, and padding */
+        $token = Token::fromKeys(keys: ['>>>???']);
+
+        /** @When rendering the opaque token */
+        $rendered = $token->toString();
+
+        /** @Then it renders the base64url form, translating plus and slash and dropping the padding */
+        self::assertSame('WyI-Pj4_Pz8iXQ', $rendered);
+    }
+
     public function testKeyedByWhenCountMismatchesThenThrowsCursorIsInvalid(): void
     {
         /** @Given a token backed by a single key value */
@@ -127,30 +127,16 @@ final class TokenTest extends TestCase
         $token->keyedBy(fields: ['created_at', 'id']);
     }
 
-    public function testToArrayWhenTokenCarriesInvalidCharacterThenThrowsCursorIsInvalid(): void
+    public function testFromKeysWhenKeysAreGappedThenDecodesToAReindexedList(): void
     {
-        /** @Given a token carrying a character outside the base64url alphabet */
-        $token = Token::from(token: 'WzEsMl0!');
-
-        /** @Then an exception indicating the cursor token is invalid is raised */
-        $this->expectException(CursorIsInvalid::class);
-        $this->expectExceptionMessage('could not be decoded');
+        /** @Given a token backed by ordering key values held under gapped integer keys */
+        $token = Token::fromKeys(keys: [5 => 'x', 9 => 'y']);
 
         /** @When decoding the token into key values */
-        $token->toArray();
-    }
+        $keys = $token->toArray();
 
-    public function testToArrayWhenTokenDecodesToScalarThenThrowsCursorIsInvalid(): void
-    {
-        /** @Given a base64url token whose decoded payload is the JSON scalar 5 */
-        $token = Token::from(token: rtrim(strtr(base64_encode('5'), '+/', '-_'), '='));
-
-        /** @Then an exception indicating the cursor token is invalid is raised */
-        $this->expectException(CursorIsInvalid::class);
-        $this->expectExceptionMessage('could not be decoded');
-
-        /** @When decoding the token into key values */
-        $token->toArray();
+        /** @Then it yields the values as a zero-based list */
+        self::assertSame(['x', 'y'], $keys);
     }
 
     public function testToArrayWhenTokenDecodesToObjectThenThrowsCursorIsInvalid(): void
@@ -166,10 +152,10 @@ final class TokenTest extends TestCase
         $token->toArray();
     }
 
-    public function testToArrayWhenTokenDecodesToListWithNestedStructureThenThrowsCursorIsInvalid(): void
+    public function testToArrayWhenTokenDecodesToScalarThenThrowsCursorIsInvalid(): void
     {
-        /** @Given a base64url token whose decoded list carries a nested array and object */
-        $token = Token::from(token: rtrim(strtr(base64_encode('[["x"],{"a":1}]'), '+/', '-_'), '='));
+        /** @Given a base64url token whose decoded payload is the JSON scalar 5 */
+        $token = Token::from(token: rtrim(strtr(base64_encode('5'), '+/', '-_'), '='));
 
         /** @Then an exception indicating the cursor token is invalid is raised */
         $this->expectException(CursorIsInvalid::class);
@@ -194,16 +180,17 @@ final class TokenTest extends TestCase
         self::assertSame(['2024-01-01', 42], $keys);
     }
 
-    public function testFromKeysWhenEncodedThenTokenIsUrlSafeAndUnpadded(): void
+    public function testToArrayWhenTokenCarriesInvalidCharacterThenThrowsCursorIsInvalid(): void
     {
-        /** @Given a token backed by key values whose base64 payload carries plus, slash, and padding */
-        $token = Token::fromKeys(keys: ['>>>???']);
+        /** @Given a token carrying a character outside the base64url alphabet */
+        $token = Token::from(token: 'WzEsMl0!');
 
-        /** @When rendering the opaque token */
-        $rendered = $token->toString();
+        /** @Then an exception indicating the cursor token is invalid is raised */
+        $this->expectException(CursorIsInvalid::class);
+        $this->expectExceptionMessage('could not be decoded');
 
-        /** @Then it renders the base64url form, translating plus and slash and dropping the padding */
-        self::assertSame('WyI-Pj4_Pz8iXQ', $rendered);
+        /** @When decoding the token into key values */
+        $token->toArray();
     }
 
     public function testFromKeysWhenRoundTrippedThroughUrlSafeTokenThenYieldsTheOriginalKeys(): void
@@ -228,5 +215,18 @@ final class TokenTest extends TestCase
 
         /** @Then the static-only cursor codec is instantiated */
         self::assertInstanceOf(CursorCodec::class, $codec);
+    }
+
+    public function testToArrayWhenTokenDecodesToListWithNestedStructureThenThrowsCursorIsInvalid(): void
+    {
+        /** @Given a base64url token whose decoded list carries a nested array and object */
+        $token = Token::from(token: rtrim(strtr(base64_encode('[["x"],{"a":1}]'), '+/', '-_'), '='));
+
+        /** @Then an exception indicating the cursor token is invalid is raised */
+        $this->expectException(CursorIsInvalid::class);
+        $this->expectExceptionMessage('could not be decoded');
+
+        /** @When decoding the token into key values */
+        $token->toArray();
     }
 }

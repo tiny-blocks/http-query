@@ -36,7 +36,7 @@ final class EndToEndTest extends TestCase
         $base = '/v1/orders?filter=status==paid;total=ge=100&sort=-created_at,id';
 
         /** @And the third page of a 480-element result built from the criteria */
-        $page = $criteria->page(total: 480, items: ['a', 'b']);
+        $page = $criteria->page(items: ['a', 'b'], total: 480);
 
         /** @When rendering the page as a JSON:API response over the orders base URI */
         $response = $page->toResponse(baseUri: '/v1/orders');
@@ -60,43 +60,6 @@ final class EndToEndTest extends TestCase
                 'last'  => sprintf('%s&page[number]=24&page[size]=20', $base)
             ]
         ], json_decode($response->getBody()->getContents(), true));
-    }
-
-    public function testPipelineWhenOffsetRequestGivenThenLinkHeaderFoldsEveryRelation(): void
-    {
-        /** @Given the query contract of the orders endpoint */
-        $schema = Schema::create()
-            ->sortable(fields: ['created_at', 'id'])
-            ->filterable(field: 'total', operators: [Operator::GREATER_THAN_OR_EQUAL])
-            ->filterable(field: 'status', operators: [Operator::EQUAL]);
-
-        /** @And the canonical request query parameters */
-        $query = Query::from(parameters: [
-            'filter' => 'status==paid;total=ge=100',
-            'sort'   => '-created_at,id',
-            'page'   => ['number' => '3', 'size' => '20']
-        ]);
-
-        /** @And the criteria parsed from those parameters */
-        $criteria = OffsetCriteria::fromQuery(request: $query, schema: $schema);
-
-        /** @And the base URI the relations render against */
-        $base = '/v1/orders?filter=status==paid;total=ge=100&sort=-created_at,id';
-
-        /** @And the Link header template rendered per relation */
-        $template = '<%s&page[number]=%d&page[size]=20>; rel="%s"';
-
-        /** @When rendering the page as a JSON:API response and reading its RFC 8288 Link header line */
-        $header = $criteria->page(total: 480, items: [])->toResponse(baseUri: '/v1/orders')->getHeaderLine('Link');
-
-        /** @Then the line folds the five relations in navigation order */
-        self::assertSame(implode(', ', [
-            sprintf($template, $base, 3, 'self'),
-            sprintf($template, $base, 1, 'first'),
-            sprintf($template, $base, 2, 'prev'),
-            sprintf($template, $base, 4, 'next'),
-            sprintf($template, $base, 24, 'last')
-        ]), $header);
     }
 
     public function testPipelineWhenCursorRequestGivenThenCursorPageRendersTheResponse(): void
@@ -133,5 +96,42 @@ final class EndToEndTest extends TestCase
                 'next' => sprintf('%s&page[cursor]=%s&page[size]=2', $base, Token::fromKeys(keys: [20])->toString())
             ]
         ], json_decode($response->getBody()->getContents(), true));
+    }
+
+    public function testPipelineWhenOffsetRequestGivenThenLinkHeaderFoldsEveryRelation(): void
+    {
+        /** @Given the query contract of the orders endpoint */
+        $schema = Schema::create()
+            ->sortable(fields: ['created_at', 'id'])
+            ->filterable(field: 'total', operators: [Operator::GREATER_THAN_OR_EQUAL])
+            ->filterable(field: 'status', operators: [Operator::EQUAL]);
+
+        /** @And the canonical request query parameters */
+        $query = Query::from(parameters: [
+            'filter' => 'status==paid;total=ge=100',
+            'sort'   => '-created_at,id',
+            'page'   => ['number' => '3', 'size' => '20']
+        ]);
+
+        /** @And the criteria parsed from those parameters */
+        $criteria = OffsetCriteria::fromQuery(request: $query, schema: $schema);
+
+        /** @And the base URI the relations render against */
+        $base = '/v1/orders?filter=status==paid;total=ge=100&sort=-created_at,id';
+
+        /** @And the Link header template rendered per relation */
+        $template = '<%s&page[number]=%d&page[size]=20>; rel="%s"';
+
+        /** @When rendering the page as a JSON:API response and reading its RFC 8288 Link header line */
+        $header = $criteria->page(items: [], total: 480)->toResponse(baseUri: '/v1/orders')->getHeaderLine('Link');
+
+        /** @Then the line folds the five relations in navigation order */
+        self::assertSame(implode(', ', [
+            sprintf($template, $base, 3, 'self'),
+            sprintf($template, $base, 1, 'first'),
+            sprintf($template, $base, 2, 'prev'),
+            sprintf($template, $base, 4, 'next'),
+            sprintf($template, $base, 24, 'last')
+        ]), $header);
     }
 }

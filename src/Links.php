@@ -38,8 +38,8 @@ final readonly class Links
      * @return Links The navigation for the result.
      */
     public static function from(
-        Sort $sort,
         Pagination $self,
+        Sort $sort,
         Filter $filter,
         string $baseUri,
         Navigation $navigation
@@ -72,11 +72,11 @@ final readonly class Links
     public function toArray(): array
     {
         return $this->links->reduce(
+            initial: [$this->self->relation->value => $this->self->uri],
             accumulator: static fn(array $body, WebLink $link): array => [
                 ...$body,
                 $link->relation->value => $link->uri
-            ],
-            initial: [$this->self->relation->value => $this->self->uri]
+            ]
         );
     }
 
@@ -88,11 +88,11 @@ final readonly class Links
     public function toHeader(): Link
     {
         return $this->links->reduce(
+            initial: Link::to(uri: $this->self->uri, relation: $this->self->relation),
             accumulator: static fn(Link $carry, WebLink $link): Link => $carry->and(
                 uri: $link->uri,
                 relation: $link->relation
-            ),
-            initial: Link::to(uri: $this->self->uri, relation: $this->self->relation)
+            )
         );
     }
 }

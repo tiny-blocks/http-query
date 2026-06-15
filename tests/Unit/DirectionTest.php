@@ -11,7 +11,7 @@ use TinyBlocks\HttpQuery\Direction;
 final class DirectionTest extends TestCase
 {
     #[DataProvider('directionCases')]
-    public function testFromWhenTokenGivenThenResolvesToCase(Direction $direction, string $token): void
+    public function testFromWhenTokenGivenThenResolvesToCase(string $token, Direction $direction): void
     {
         /** @Given a canonical token and the direction it maps to */
 
@@ -23,7 +23,7 @@ final class DirectionTest extends TestCase
     }
 
     #[DataProvider('directionCases')]
-    public function testValueWhenCaseGivenThenExposesCanonicalToken(Direction $direction, string $token): void
+    public function testValueWhenCaseGivenThenExposesCanonicalToken(string $token, Direction $direction): void
     {
         /** @Given a sort direction and its canonical token */
 
@@ -36,8 +36,8 @@ final class DirectionTest extends TestCase
 
     #[DataProvider('prefixCases')]
     public function testPrefixWhenCaseGivenThenReturnsTheSortExpressionPrefix(
-        Direction $direction,
-        string $prefix
+        string $prefix,
+        Direction $direction
     ): void {
         /** @Given a sort direction and its sort-expression prefix */
 

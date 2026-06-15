@@ -50,7 +50,7 @@ final readonly class Slice
     {
         /** @var Collection<TElement> $collection */
         $collection = Collection::createFrom(elements: $items);
-        $window = Window::from(limit: $pagination->limit(), items: $collection);
+        $window = Window::from(items: $collection, limit: $pagination->limit());
 
         /** @var Collection<TElement> $trimmed */
         $trimmed = $window->items();
@@ -162,8 +162,8 @@ final readonly class Slice
     public function toResponse(string $baseUri): ResponseInterface
     {
         return Rendering::of(
-            sort: $this->sort,
             self: $this->pagination,
+            sort: $this->sort,
             items: $this->items,
             filter: $this->filter,
             baseUri: $baseUri,

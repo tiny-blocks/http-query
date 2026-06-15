@@ -18,6 +18,33 @@ use TinyBlocks\HttpQuery\Sort;
 
 final class CriteriaTest extends TestCase
 {
+    public function testSortWhenNoClientSortAndNoDefaultThenIsEmpty(): void
+    {
+        /** @Given a schema declaring no sortable field and no default sort */
+        $schema = Schema::create();
+
+        /** @When reading the effective sort from a query carrying no sort */
+        $sort = Criteria::fromQuery(request: Query::from(parameters: []), schema: $schema)->sort();
+
+        /** @Then the effective sort is empty */
+        self::assertTrue($sort->isEmpty());
+    }
+
+    public function testPageWhenBuiltFromRequestThenReturnsOffsetPage(): void
+    {
+        /** @Given a criteria parsed from a request carrying a page size of three */
+        $criteria = Criteria::fromQuery(request: Query::from(parameters: ['page' => ['size' => '3']]));
+
+        /** @When building an offset page from the total element count and the items */
+        $page = $criteria->page(items: ['a', 'b', 'c'], total: 30);
+
+        /** @Then the result is an offset page */
+        self::assertInstanceOf(Page::class, $page);
+
+        /** @And it carries the total element count */
+        self::assertSame(30, $page->total());
+    }
+
     public function testFromQueryWhenEmptyThenOffsetAndLimitAreDefaults(): void
     {
         /** @Given empty query parameters */
@@ -31,6 +58,21 @@ final class CriteriaTest extends TestCase
 
         /** @And the limit carries the default page size */
         self::assertSame(20, $criteria->limit());
+    }
+
+    public function testSliceWhenBuiltFromRequestThenReturnsOffsetSlice(): void
+    {
+        /** @Given a criteria parsed from a request carrying a page size of three */
+        $criteria = Criteria::fromQuery(request: Query::from(parameters: ['page' => ['size' => '3']]));
+
+        /** @When building an offset slice from the items fetched for the page size plus one */
+        $slice = $criteria->slice(items: ['a', 'b', 'c', 'd']);
+
+        /** @Then the result is an offset slice */
+        self::assertInstanceOf(Slice::class, $slice);
+
+        /** @And it reports a next page from the trimmed extra element */
+        self::assertTrue($slice->hasNext());
     }
 
     public function testFromQueryWhenPerPageAtMaximumThenLimitIsAccepted(): void
@@ -70,79 +112,6 @@ final class CriteriaTest extends TestCase
         self::assertEquals(Sort::fromExpression(expression: '-created_at'), $sort);
     }
 
-    public function testSortWhenNoClientSortAndNoDefaultThenIsEmpty(): void
-    {
-        /** @Given a schema declaring no sortable field and no default sort */
-        $schema = Schema::create();
-
-        /** @When reading the effective sort from a query carrying no sort */
-        $sort = Criteria::fromQuery(request: Query::from(parameters: []), schema: $schema)->sort();
-
-        /** @Then the effective sort is empty */
-        self::assertTrue($sort->isEmpty());
-    }
-
-    public function testSortWhenClientSortsDisallowedFieldThenThrowsSortFieldNotAllowed(): void
-    {
-        /** @Given a schema allowing the client to sort by a single field */
-        $schema = Schema::create()->sortable(fields: ['id']);
-
-        /** @And a query sorting by a field that was never declared sortable */
-        $query = Query::from(parameters: ['sort' => 'name']);
-
-        /** @Then an exception indicating the sort field is not allowed is raised */
-        $this->expectException(SortFieldNotAllowed::class);
-        $this->expectExceptionMessage('Sort field <name> is not allowed.');
-
-        /** @When building the criteria from the query */
-        Criteria::fromQuery(request: $query, schema: $schema);
-    }
-
-    public function testSortWhenServerControlledAndClientSortsThenThrowsSortFieldNotAllowed(): void
-    {
-        /** @Given a schema with a server-controlled default and no client-sortable field */
-        $schema = Schema::create()->defaultSort(sort: Sort::fromExpression(expression: '-created_at'));
-
-        /** @And a query carrying a client sort */
-        $query = Query::from(parameters: ['sort' => 'id']);
-
-        /** @Then an exception indicating the sort field is not allowed is raised */
-        $this->expectException(SortFieldNotAllowed::class);
-
-        /** @When building the criteria from the query */
-        Criteria::fromQuery(request: $query, schema: $schema);
-    }
-
-    public function testPageWhenBuiltFromRequestThenReturnsOffsetPage(): void
-    {
-        /** @Given a criteria parsed from a request carrying a page size of three */
-        $criteria = Criteria::fromQuery(request: Query::from(parameters: ['page' => ['size' => '3']]));
-
-        /** @When building an offset page from the total element count and the items */
-        $page = $criteria->page(total: 30, items: ['a', 'b', 'c']);
-
-        /** @Then the result is an offset page */
-        self::assertInstanceOf(Page::class, $page);
-
-        /** @And it carries the total element count */
-        self::assertSame(30, $page->total());
-    }
-
-    public function testSliceWhenBuiltFromRequestThenReturnsOffsetSlice(): void
-    {
-        /** @Given a criteria parsed from a request carrying a page size of three */
-        $criteria = Criteria::fromQuery(request: Query::from(parameters: ['page' => ['size' => '3']]));
-
-        /** @When building an offset slice from the items fetched for the page size plus one */
-        $slice = $criteria->slice(items: ['a', 'b', 'c', 'd']);
-
-        /** @Then the result is an offset slice */
-        self::assertInstanceOf(Slice::class, $slice);
-
-        /** @And it reports a next page from the trimmed extra element */
-        self::assertTrue($slice->hasNext());
-    }
-
     public function testFromQueryWhenCustomSchemaGivenThenAppliesItsDefaultPageSize(): void
     {
         /** @Given query parameters carrying a page number without a page size */
@@ -159,6 +128,35 @@ final class CriteriaTest extends TestCase
 
         /** @And the limit carries the schema default page size */
         self::assertSame(5, $criteria->limit());
+    }
+
+    public function testFromQueryWhenPerPageAboveMaximumThenThrowsPageSizeOutOfRange(): void
+    {
+        /** @Given query parameters carrying a page size above the default maximum */
+        $query = Query::from(parameters: ['page' => ['size' => '500']]);
+
+        /** @Then an exception indicating the page size is out of range is raised */
+        $this->expectException(PageSizeOutOfRange::class);
+        $this->expectExceptionMessage('Page size');
+
+        /** @When building the criteria from the query */
+        Criteria::fromQuery(request: $query);
+    }
+
+    public function testSortWhenClientSortsDisallowedFieldThenThrowsSortFieldNotAllowed(): void
+    {
+        /** @Given a schema allowing the client to sort by a single field */
+        $schema = Schema::create()->sortable(fields: ['id']);
+
+        /** @And a query sorting by a field that was never declared sortable */
+        $query = Query::from(parameters: ['sort' => 'name']);
+
+        /** @Then an exception indicating the sort field is not allowed is raised */
+        $this->expectException(SortFieldNotAllowed::class);
+        $this->expectExceptionMessage('Sort field <name> is not allowed.');
+
+        /** @When building the criteria from the query */
+        Criteria::fromQuery(request: $query, schema: $schema);
     }
 
     public function testFromQueryWhenFilterSortAndPageGivenThenEachSpecificationIsValidated(): void
@@ -194,16 +192,18 @@ final class CriteriaTest extends TestCase
         self::assertSame(15, $criteria->limit());
     }
 
-    public function testFromQueryWhenPerPageAboveMaximumThenThrowsPageSizeOutOfRange(): void
+    public function testSortWhenServerControlledAndClientSortsThenThrowsSortFieldNotAllowed(): void
     {
-        /** @Given query parameters carrying a page size above the default maximum */
-        $query = Query::from(parameters: ['page' => ['size' => '500']]);
+        /** @Given a schema with a server-controlled default and no client-sortable field */
+        $schema = Schema::create()->defaultSort(sort: Sort::fromExpression(expression: '-created_at'));
 
-        /** @Then an exception indicating the page size is out of range is raised */
-        $this->expectException(PageSizeOutOfRange::class);
-        $this->expectExceptionMessage('Page size');
+        /** @And a query carrying a client sort */
+        $query = Query::from(parameters: ['sort' => 'id']);
+
+        /** @Then an exception indicating the sort field is not allowed is raised */
+        $this->expectException(SortFieldNotAllowed::class);
 
         /** @When building the criteria from the query */
-        Criteria::fromQuery(request: $query);
+        Criteria::fromQuery(request: $query, schema: $schema);
     }
 }

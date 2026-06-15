@@ -11,7 +11,7 @@ use TinyBlocks\HttpQuery\LogicalOperator;
 final class LogicalOperatorTest extends TestCase
 {
     #[DataProvider('logicalOperatorCases')]
-    public function testFromWhenTokenGivenThenResolvesToCase(LogicalOperator $operator, string $token): void
+    public function testFromWhenTokenGivenThenResolvesToCase(string $token, LogicalOperator $operator): void
     {
         /** @Given a canonical token and the connective it maps to */
 
@@ -23,7 +23,7 @@ final class LogicalOperatorTest extends TestCase
     }
 
     #[DataProvider('logicalOperatorCases')]
-    public function testValueWhenCaseGivenThenExposesCanonicalToken(LogicalOperator $operator, string $token): void
+    public function testValueWhenCaseGivenThenExposesCanonicalToken(string $token, LogicalOperator $operator): void
     {
         /** @Given a logical connective and its canonical token */
 
@@ -36,9 +36,9 @@ final class LogicalOperatorTest extends TestCase
 
     #[DataProvider('precedenceCases')]
     public function testBindsTighterThanWhenComparedToOtherThenReflectsPrecedence(
-        LogicalOperator $operator,
         LogicalOperator $other,
-        bool $expected
+        bool $expected,
+        LogicalOperator $operator
     ): void {
         /** @Given a connective and another connective to compare against */
 

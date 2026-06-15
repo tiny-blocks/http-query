@@ -58,7 +58,7 @@ final readonly class Page
     ): Page {
         /** @var Collection<TElement> $collection */
         $collection = Collection::createFrom(elements: $items);
-        $seek = Seek::from(limit: $pagination->limit(), items: $collection, keysOf: $keysOf);
+        $seek = Seek::from(items: $collection, limit: $pagination->limit(), keysOf: $keysOf);
 
         return new Page(
             sort: $sort,
@@ -157,8 +157,8 @@ final readonly class Page
     public function toResponse(string $baseUri): ResponseInterface
     {
         return Rendering::of(
-            sort: $this->sort,
             self: $this->pagination,
+            sort: $this->sort,
             items: $this->items,
             filter: $this->filter,
             baseUri: $baseUri,

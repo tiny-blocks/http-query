@@ -72,6 +72,21 @@ final class KeysetTest extends TestCase
         self::assertEquals(Pagination::from(cursor: Token::fromKeys(keys: [20]), perPage: 2), $page->next());
     }
 
+    public function testCursorWhenNoIncomingCursorThenEverySortFieldIsNull(): void
+    {
+        /** @Given a keyset view built from a request carrying a sort over two fields */
+        $keyset = Criteria::fromQuery(
+            request: Query::from(parameters: ['sort' => 'created_at,id', 'page' => ['size' => '2']]),
+            schema: $this->schema
+        )->keyset();
+
+        /** @When reading the incoming cursor key values */
+        $cursor = $keyset->cursor();
+
+        /** @Then every sort field is present with a null value */
+        self::assertSame(['created_at' => null, 'id' => null], $cursor);
+    }
+
     public function testPageWhenNoKeysOfGivenThenDerivesKeysFromTheSortFields(): void
     {
         /** @Given a keyset view built from a request carrying a sort and a page size of two */
@@ -88,21 +103,6 @@ final class KeysetTest extends TestCase
 
         /** @And the next pagination anchors on the sort-field keys of the last retained row */
         self::assertEquals(Pagination::from(cursor: Token::fromKeys(keys: [20]), perPage: 2), $page->next());
-    }
-
-    public function testCursorWhenNoIncomingCursorThenEverySortFieldIsNull(): void
-    {
-        /** @Given a keyset view built from a request carrying a sort over two fields */
-        $keyset = Criteria::fromQuery(
-            request: Query::from(parameters: ['sort' => 'created_at,id', 'page' => ['size' => '2']]),
-            schema: $this->schema
-        )->keyset();
-
-        /** @When reading the incoming cursor key values */
-        $cursor = $keyset->cursor();
-
-        /** @Then every sort field is present with a null value */
-        self::assertSame(['created_at' => null, 'id' => null], $cursor);
     }
 
     public function testCursorWhenIncomingCursorGivenThenKeysValuesBySortField(): void

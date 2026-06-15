@@ -35,6 +35,18 @@ final class PaginationTest extends TestCase
         self::assertSame('page[size]=10', $queryString);
     }
 
+    public function testToQueryStringWhenCursorPresentThenRendersCursorAndSize(): void
+    {
+        /** @Given a cursor pagination carrying an incoming cursor and a page size */
+        $pagination = Pagination::from(cursor: Token::from(token: 'abc'), perPage: 10);
+
+        /** @When rendering it as a query string */
+        $queryString = $pagination->toQueryString();
+
+        /** @Then it renders the cursor token followed by the page size in the JSON:API page family */
+        self::assertSame('page[cursor]=abc&page[size]=10', $queryString);
+    }
+
     public function testFromWhenAbsentCursorGivenThenCarriesLimitAndAbsentCursor(): void
     {
         /** @Given a cursor pagination built from an absent cursor and a page size of 20 */
@@ -60,18 +72,6 @@ final class PaginationTest extends TestCase
 
         /** @When building a cursor pagination with a page size below the minimum */
         Pagination::from(cursor: $cursor, perPage: 0);
-    }
-
-    public function testToQueryStringWhenCursorPresentThenRendersCursorAndSize(): void
-    {
-        /** @Given a cursor pagination carrying an incoming cursor and a page size */
-        $pagination = Pagination::from(cursor: Token::from(token: 'abc'), perPage: 10);
-
-        /** @When rendering it as a query string */
-        $queryString = $pagination->toQueryString();
-
-        /** @Then it renders the cursor token followed by the page size in the JSON:API page family */
-        self::assertSame('page[cursor]=abc&page[size]=10', $queryString);
     }
 
     public function testFromWhenIncomingCursorGivenThenCarriesLimitAndTheCursorToken(): void

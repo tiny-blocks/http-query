@@ -14,18 +14,6 @@ use TinyBlocks\HttpQuery\Offset\Pagination;
 
 final class SliceTest extends TestCase
 {
-    public function testOffsetWhenSecondPageGivenThenReturnsTheZeroBasedOffset(): void
-    {
-        /** @Given a criteria on the second page with a page size of three */
-        $criteria = Criteria::fromQuery(request: Query::from(parameters: ['page' => ['number' => '2', 'size' => '3']]));
-
-        /** @When building the slice from the items fetched for the page size plus one */
-        $slice = $criteria->slice(items: ['a', 'b', 'c', 'd']);
-
-        /** @Then the offset is derived from the page and the page size */
-        self::assertSame(3, $slice->offset());
-    }
-
     public function testToResponseWhenSliceGivenThenRendersBodyAndLinkHeader(): void
     {
         /** @Given a criteria on the second page with a page size of three */
@@ -61,6 +49,18 @@ final class SliceTest extends TestCase
             '</v1/orders?page[number]=1&page[size]=3>; rel="prev"',
             '</v1/orders?page[number]=3&page[size]=3>; rel="next"'
         ]), $response->getHeaderLine('Link'));
+    }
+
+    public function testOffsetWhenSecondPageGivenThenReturnsTheZeroBasedOffset(): void
+    {
+        /** @Given a criteria on the second page with a page size of three */
+        $criteria = Criteria::fromQuery(request: Query::from(parameters: ['page' => ['number' => '2', 'size' => '3']]));
+
+        /** @When building the slice from the items fetched for the page size plus one */
+        $slice = $criteria->slice(items: ['a', 'b', 'c', 'd']);
+
+        /** @Then the offset is derived from the page and the page size */
+        self::assertSame(3, $slice->offset());
     }
 
     public function testNavigationWhenExtraElementFetchedThenHasNextAndTrimsItems(): void

@@ -34,47 +34,6 @@ final readonly class FilterParser
         return $filter;
     }
 
-    private function disjunction(int $depth): Filter
-    {
-        $filters = [$this->conjunction(depth: $depth)];
-
-        while ($this->scanner->peek() === LogicalOperator::OR->value) {
-            $this->scanner->expect(character: LogicalOperator::OR->value);
-            $filters[] = $this->conjunction(depth: $depth);
-        }
-
-        return count($filters) === 1 ? $filters[0] : Group::of(filters: $filters, operator: LogicalOperator::OR);
-    }
-
-    private function conjunction(int $depth): Filter
-    {
-        $filters = [$this->constraint(depth: $depth)];
-
-        while ($this->scanner->peek() === LogicalOperator::AND->value) {
-            $this->scanner->expect(character: LogicalOperator::AND->value);
-            $filters[] = $this->constraint(depth: $depth);
-        }
-
-        return count($filters) === 1 ? $filters[0] : Group::of(filters: $filters, operator: LogicalOperator::AND);
-    }
-
-    private function constraint(int $depth): Filter
-    {
-        if ($this->scanner->peek() === '(') {
-            if ($depth >= FilterParser::MAX_DEPTH) {
-                throw FilterExpressionIsInvalid::from(expression: $this->input);
-            }
-
-            $this->scanner->expect(character: '(');
-            $group = $this->disjunction(depth: $depth + 1);
-            $this->scanner->expect(character: ')');
-
-            return $group;
-        }
-
-        return $this->comparison();
-    }
-
     private function comparison(): Comparison
     {
         $field = $this->scanner->unreserved();
@@ -95,5 +54,46 @@ final readonly class FilterParser
         $this->scanner->expect(character: ')');
 
         return Comparison::of(field: $field, values: $values, operator: $operator);
+    }
+
+    private function constraint(int $depth): Filter
+    {
+        if ($this->scanner->peek() === '(') {
+            if ($depth >= FilterParser::MAX_DEPTH) {
+                throw FilterExpressionIsInvalid::from(expression: $this->input);
+            }
+
+            $this->scanner->expect(character: '(');
+            $group = $this->disjunction(depth: $depth + 1);
+            $this->scanner->expect(character: ')');
+
+            return $group;
+        }
+
+        return $this->comparison();
+    }
+
+    private function conjunction(int $depth): Filter
+    {
+        $filters = [$this->constraint(depth: $depth)];
+
+        while ($this->scanner->peek() === LogicalOperator::AND->value) {
+            $this->scanner->expect(character: LogicalOperator::AND->value);
+            $filters[] = $this->constraint(depth: $depth);
+        }
+
+        return count($filters) === 1 ? $filters[0] : Group::of(filters: $filters, operator: LogicalOperator::AND);
+    }
+
+    private function disjunction(int $depth): Filter
+    {
+        $filters = [$this->conjunction(depth: $depth)];
+
+        while ($this->scanner->peek() === LogicalOperator::OR->value) {
+            $this->scanner->expect(character: LogicalOperator::OR->value);
+            $filters[] = $this->conjunction(depth: $depth);
+        }
+
+        return count($filters) === 1 ? $filters[0] : Group::of(filters: $filters, operator: LogicalOperator::OR);
     }
 }

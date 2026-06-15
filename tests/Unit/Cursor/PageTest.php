@@ -34,8 +34,8 @@ final class PageTest extends TestCase
         /** @And a cursor page built from items fetched within the page size */
         $page = Page::from(
             sort: $this->sort,
-            filter: $this->filter,
             items: [10, 20],
+            filter: $this->filter,
             keysOf: static fn(int $element): array => [$element],
             pagination: $pagination
         );
@@ -53,6 +53,34 @@ final class PageTest extends TestCase
         self::assertSame(['per_page' => 2, 'has_next' => false], $page->metadata());
     }
 
+    public function testToResponseWhenFirstCursorPageThenSelfLinkIsCursorStyle(): void
+    {
+        /** @Given a cursor page on the first page with no incoming cursor */
+        $page = Page::from(
+            sort: $this->sort,
+            items: [10, 20, 30],
+            filter: $this->filter,
+            keysOf: static fn(int $element): array => [$element],
+            pagination: Pagination::from(cursor: Token::none(), perPage: 2)
+        );
+
+        /** @When rendering the first cursor page as a JSON:API response over the orders base URI */
+        $response = $page->toResponse(baseUri: '/v1/orders');
+
+        /** @Then the self link is cursor-style, carrying only the page size and never an offset page number */
+        self::assertSame([
+            'data'  => [10, 20],
+            'meta'  => [
+                'per_page' => 2,
+                'has_next' => true
+            ],
+            'links' => [
+                'self' => '/v1/orders?page[size]=2',
+                'next' => sprintf('/v1/orders?page[cursor]=%s&page[size]=2', Token::fromKeys(keys: [20])->toString())
+            ]
+        ], json_decode($response->getBody()->getContents(), true));
+    }
+
     public function testToResponseWhenCursorPageGivenThenRendersBodyAndLinkHeader(): void
     {
         /** @Given an opaque token produced from ordering key values */
@@ -61,8 +89,8 @@ final class PageTest extends TestCase
         /** @And a cursor page built over items fetched for the page size plus one */
         $page = Page::from(
             sort: $this->sort,
-            filter: $this->filter,
             items: [10, 20, 30],
+            filter: $this->filter,
             keysOf: static fn(int $element): array => [$element],
             pagination: Pagination::from(cursor: Token::from(token: $token), perPage: 2)
         );
@@ -90,41 +118,13 @@ final class PageTest extends TestCase
         ]), $response->getHeaderLine('Link'));
     }
 
-    public function testToResponseWhenFirstCursorPageThenSelfLinkIsCursorStyle(): void
-    {
-        /** @Given a cursor page on the first page with no incoming cursor */
-        $page = Page::from(
-            sort: $this->sort,
-            filter: $this->filter,
-            items: [10, 20, 30],
-            keysOf: static fn(int $element): array => [$element],
-            pagination: Pagination::from(cursor: Token::none(), perPage: 2)
-        );
-
-        /** @When rendering the first cursor page as a JSON:API response over the orders base URI */
-        $response = $page->toResponse(baseUri: '/v1/orders');
-
-        /** @Then the self link is cursor-style, carrying only the page size and never an offset page number */
-        self::assertSame([
-            'data'  => [10, 20],
-            'meta'  => [
-                'per_page' => 2,
-                'has_next' => true
-            ],
-            'links' => [
-                'self' => '/v1/orders?page[size]=2',
-                'next' => sprintf('/v1/orders?page[cursor]=%s&page[size]=2', Token::fromKeys(keys: [20])->toString())
-            ]
-        ], json_decode($response->getBody()->getContents(), true));
-    }
-
     public function testNavigationWhenExtraElementFetchedThenListsOnlyTheNextTarget(): void
     {
         /** @Given a keyset page fetched for the page size plus one with an absent incoming cursor */
         $page = Page::from(
             sort: $this->sort,
-            filter: $this->filter,
             items: [10, 20, 30],
+            filter: $this->filter,
             keysOf: static fn(int $element): array => [$element],
             pagination: Pagination::from(cursor: Token::none(), perPage: 2)
         );
@@ -150,8 +150,8 @@ final class PageTest extends TestCase
         /** @Given a cursor page built over items fetched for the page size plus one */
         $page = Page::from(
             sort: $this->sort,
-            filter: $this->filter,
             items: [10, 20, 30],
+            filter: $this->filter,
             keysOf: static fn(int $element): array => [$element],
             pagination: Pagination::from(cursor: Token::none(), perPage: 2)
         );
@@ -180,8 +180,8 @@ final class PageTest extends TestCase
         /** @And a cursor page built over array rows then projected to their identifiers */
         $page = Page::from(
             sort: $this->sort,
-            filter: $this->filter,
             items: [['id' => 10], ['id' => 20], ['id' => 30]],
+            filter: $this->filter,
             keysOf: static fn(array $row): array => [$row['id']],
             pagination: Pagination::from(cursor: Token::from(token: $token), perPage: 2)
         )->map(transformation: static fn(array $row): int => (int)$row['id']);
@@ -211,8 +211,8 @@ final class PageTest extends TestCase
         /** @And a cursor page built over items fetched for the page size plus one */
         $page = Page::from(
             sort: $this->sort,
-            filter: $this->filter,
             items: [10, 20, 30],
+            filter: $this->filter,
             keysOf: static fn(int $element): array => [$element],
             pagination: $pagination
         );

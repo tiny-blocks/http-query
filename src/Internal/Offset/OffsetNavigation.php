@@ -11,8 +11,8 @@ final readonly class OffsetNavigation
 {
     private function __construct(
         private bool $hasNext,
-        private Pagination $pagination,
-        private PageNumber $pageNumber
+        private PageNumber $pageNumber,
+        private Pagination $pagination
     ) {
     }
 
@@ -23,8 +23,8 @@ final readonly class OffsetNavigation
 
         return new OffsetNavigation(
             hasNext: $hasNext,
-            pagination: $pagination,
-            pageNumber: PageNumber::fromOffset(limit: $limit, offset: $offset)
+            pageNumber: PageNumber::fromOffset(limit: $limit, offset: $offset),
+            pagination: $pagination
         );
     }
 

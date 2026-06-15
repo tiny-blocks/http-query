@@ -12,7 +12,7 @@ final readonly class PageCount
     {
     }
 
-    public static function from(Total $total, Limit $limit): PageCount
+    public static function from(Limit $limit, Total $total): PageCount
     {
         return new PageCount(value: (int)ceil($total->value() / $limit->value()));
     }

@@ -10,30 +10,6 @@ use TinyBlocks\HttpQuery\Operator;
 
 final class ComparisonTest extends TestCase
 {
-    public function testFieldThenReturnsTheComparedField(): void
-    {
-        /** @Given an equality comparison on a field */
-        $comparison = Comparison::of(field: 'status', values: ['paid'], operator: Operator::EQUAL);
-
-        /** @When reading the compared field */
-        $field = $comparison->field();
-
-        /** @Then it returns the field being compared */
-        self::assertSame('status', $field);
-    }
-
-    public function testValuesThenReturnsTheComparedValues(): void
-    {
-        /** @Given an IN comparison carrying several values */
-        $comparison = Comparison::of(field: 'role', values: ['admin', 'user'], operator: Operator::IN);
-
-        /** @When reading the compared values */
-        $values = $comparison->values();
-
-        /** @Then it returns the values compared against the field in order */
-        self::assertSame(['admin', 'user'], $values);
-    }
-
     public function testIsEmptyThenReportsItIsNotEmpty(): void
     {
         /** @Given an equality comparison */
@@ -46,16 +22,16 @@ final class ComparisonTest extends TestCase
         self::assertFalse($isEmpty);
     }
 
-    public function testOperatorThenReturnsTheComparisonOperator(): void
+    public function testFieldThenReturnsTheComparedField(): void
     {
-        /** @Given an equality comparison */
+        /** @Given an equality comparison on a field */
         $comparison = Comparison::of(field: 'status', values: ['paid'], operator: Operator::EQUAL);
 
-        /** @When reading the comparison operator */
-        $operator = $comparison->operator();
+        /** @When reading the compared field */
+        $field = $comparison->field();
 
-        /** @Then it returns the operator the comparison carries */
-        self::assertSame(Operator::EQUAL, $operator);
+        /** @Then it returns the field being compared */
+        self::assertSame('status', $field);
     }
 
     public function testHasFieldWhenFieldMatchesThenIsTrue(): void
@@ -70,6 +46,18 @@ final class ComparisonTest extends TestCase
         self::assertTrue($hasField);
     }
 
+    public function testValuesThenReturnsTheComparedValues(): void
+    {
+        /** @Given an IN comparison carrying several values */
+        $comparison = Comparison::of(field: 'role', values: ['admin', 'user'], operator: Operator::IN);
+
+        /** @When reading the compared values */
+        $values = $comparison->values();
+
+        /** @Then it returns the values compared against the field in order */
+        self::assertSame(['admin', 'user'], $values);
+    }
+
     public function testHasFieldWhenFieldDiffersThenIsFalse(): void
     {
         /** @Given an equality comparison on a field */
@@ -80,18 +68,6 @@ final class ComparisonTest extends TestCase
 
         /** @Then it reports that it does not target the field */
         self::assertFalse($hasField);
-    }
-
-    public function testFirstValueWhenMultipleValuesThenReturnsTheFirst(): void
-    {
-        /** @Given an IN comparison carrying several values */
-        $comparison = Comparison::of(field: 'role', values: ['admin', 'user'], operator: Operator::IN);
-
-        /** @When reading the first compared value */
-        $firstValue = $comparison->firstValue();
-
-        /** @Then it returns the first of the compared values */
-        self::assertSame('admin', $firstValue);
     }
 
     public function testHasOperatorWhenOperatorMatchesThenIsTrue(): void
@@ -106,6 +82,18 @@ final class ComparisonTest extends TestCase
         self::assertTrue($hasOperator);
     }
 
+    public function testOperatorThenReturnsTheComparisonOperator(): void
+    {
+        /** @Given an equality comparison */
+        $comparison = Comparison::of(field: 'status', values: ['paid'], operator: Operator::EQUAL);
+
+        /** @When reading the comparison operator */
+        $operator = $comparison->operator();
+
+        /** @Then it returns the operator the comparison carries */
+        self::assertSame(Operator::EQUAL, $operator);
+    }
+
     public function testHasOperatorWhenOperatorDiffersThenIsFalse(): void
     {
         /** @Given an equality comparison */
@@ -116,5 +104,17 @@ final class ComparisonTest extends TestCase
 
         /** @Then it reports that it does not carry the operator */
         self::assertFalse($hasOperator);
+    }
+
+    public function testFirstValueWhenMultipleValuesThenReturnsTheFirst(): void
+    {
+        /** @Given an IN comparison carrying several values */
+        $comparison = Comparison::of(field: 'role', values: ['admin', 'user'], operator: Operator::IN);
+
+        /** @When reading the first compared value */
+        $firstValue = $comparison->firstValue();
+
+        /** @Then it returns the first of the compared values */
+        self::assertSame('admin', $firstValue);
     }
 }

@@ -11,7 +11,7 @@ use TinyBlocks\HttpQuery\Operator;
 final class OperatorTest extends TestCase
 {
     #[DataProvider('operatorCases')]
-    public function testFromWhenTokenGivenThenResolvesToCase(Operator $operator, string $token): void
+    public function testFromWhenTokenGivenThenResolvesToCase(string $token, Operator $operator): void
     {
         /** @Given a canonical token and the operator it maps to */
 
@@ -23,7 +23,7 @@ final class OperatorTest extends TestCase
     }
 
     #[DataProvider('operatorCases')]
-    public function testValueWhenCaseGivenThenExposesCanonicalToken(Operator $operator, string $token): void
+    public function testValueWhenCaseGivenThenExposesCanonicalToken(string $token, Operator $operator): void
     {
         /** @Given a comparison operator and its canonical token */
 

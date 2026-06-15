@@ -15,49 +15,6 @@ use TinyBlocks\HttpQuery\Offset\Pagination;
 
 final class PageTest extends TestCase
 {
-    public function testTotalWhenPageGivenThenReturnsTheTotalElementCount(): void
-    {
-        /** @Given a criteria on the first page with a page size of twenty */
-        $criteria = Criteria::fromQuery(
-            request: Query::from(parameters: ['page' => ['number' => '1', 'size' => '20']])
-        );
-
-        /** @When building the page from the total element count */
-        $page = $criteria->page(total: 480, items: ['a', 'b']);
-
-        /** @Then the total is the count provided across every page */
-        self::assertSame(480, $page->total());
-    }
-
-    public function testItemsWhenPageGivenThenCarriesTheProvidedItems(): void
-    {
-        /** @Given a criteria on the third page with a page size of twenty */
-        $criteria = Criteria::fromQuery(
-            request: Query::from(parameters: ['page' => ['number' => '3', 'size' => '20']])
-        );
-
-        /** @When building the page and reading its items */
-        $page = $criteria->page(total: 480, items: ['a', 'b']);
-
-        /** @Then the items carry the provided elements */
-        self::assertSame(['a', 'b'], $page->items()->toArray(keyPreservation: KeyPreservation::DISCARD));
-    }
-
-    public function testFromWhenTotalIsNegativeThenThrowsTotalIsNegative(): void
-    {
-        /** @Given a criteria on the first page */
-        $criteria = Criteria::fromQuery(
-            request: Query::from(parameters: ['page' => ['number' => '1', 'size' => '20']])
-        );
-
-        /** @Then an exception indicating the total is negative is raised */
-        $this->expectException(TotalIsNegative::class);
-        $this->expectExceptionMessage('Total');
-
-        /** @When building a page from a negative total */
-        $criteria->page(total: -1, items: []);
-    }
-
     public function testNavigationWhenTotalIsZeroThenThereIsNoPage(): void
     {
         /** @Given a criteria on the first page */
@@ -66,7 +23,7 @@ final class PageTest extends TestCase
         );
 
         /** @When building the page from a total of zero */
-        $page = $criteria->page(total: 0, items: []);
+        $page = $criteria->page(items: [], total: 0);
 
         /** @Then there are no pages */
         self::assertSame(0, $page->totalPages());
@@ -99,7 +56,7 @@ final class PageTest extends TestCase
         );
 
         /** @When building the page from the total element count */
-        $page = $criteria->page(total: 480, items: ['a', 'b']);
+        $page = $criteria->page(items: ['a', 'b'], total: 480);
 
         /** @Then the page reports no next page */
         self::assertFalse($page->hasNext());
@@ -114,6 +71,35 @@ final class PageTest extends TestCase
         self::assertSame(24, $page->last()?->page());
     }
 
+    public function testItemsWhenPageGivenThenCarriesTheProvidedItems(): void
+    {
+        /** @Given a criteria on the third page with a page size of twenty */
+        $criteria = Criteria::fromQuery(
+            request: Query::from(parameters: ['page' => ['number' => '3', 'size' => '20']])
+        );
+
+        /** @When building the page and reading its items */
+        $page = $criteria->page(items: ['a', 'b'], total: 480);
+
+        /** @Then the items carry the provided elements */
+        self::assertSame(['a', 'b'], $page->items()->toArray(keyPreservation: KeyPreservation::DISCARD));
+    }
+
+    public function testFromWhenTotalIsNegativeThenThrowsTotalIsNegative(): void
+    {
+        /** @Given a criteria on the first page */
+        $criteria = Criteria::fromQuery(
+            request: Query::from(parameters: ['page' => ['number' => '1', 'size' => '20']])
+        );
+
+        /** @Then an exception indicating the total is negative is raised */
+        $this->expectException(TotalIsNegative::class);
+        $this->expectExceptionMessage('Total');
+
+        /** @When building a page from a negative total */
+        $criteria->page(items: [], total: -1);
+    }
+
     public function testNavigationWhenFirstPageGivenThenHasNoPreviousPage(): void
     {
         /** @Given a criteria on the first page */
@@ -122,7 +108,7 @@ final class PageTest extends TestCase
         );
 
         /** @When building the page from the total element count */
-        $page = $criteria->page(total: 480, items: ['a', 'b']);
+        $page = $criteria->page(items: ['a', 'b'], total: 480);
 
         /** @Then the page reports no previous page */
         self::assertFalse($page->hasPrevious());
@@ -143,6 +129,20 @@ final class PageTest extends TestCase
         self::assertSame(24, $page->last()?->page());
     }
 
+    public function testTotalWhenPageGivenThenReturnsTheTotalElementCount(): void
+    {
+        /** @Given a criteria on the first page with a page size of twenty */
+        $criteria = Criteria::fromQuery(
+            request: Query::from(parameters: ['page' => ['number' => '1', 'size' => '20']])
+        );
+
+        /** @When building the page from the total element count */
+        $page = $criteria->page(items: ['a', 'b'], total: 480);
+
+        /** @Then the total is the count provided across every page */
+        self::assertSame(480, $page->total());
+    }
+
     public function testTotalPagesWhenTotalIsNotAMultipleOfPerPageThenRoundsUp(): void
     {
         /** @Given a criteria on the first page with a page size of twenty */
@@ -151,7 +151,7 @@ final class PageTest extends TestCase
         );
 
         /** @When building the page from a total that is not a multiple of the page size */
-        $page = $criteria->page(total: 21, items: ['a', 'b']);
+        $page = $criteria->page(items: ['a', 'b'], total: 21);
 
         /** @Then the total number of pages rounds the division up */
         self::assertSame(2, $page->totalPages());
@@ -165,7 +165,7 @@ final class PageTest extends TestCase
         );
 
         /** @When building the page from the total element count */
-        $page = $criteria->page(total: 480, items: ['a', 'b']);
+        $page = $criteria->page(items: ['a', 'b'], total: 480);
 
         /** @Then the metadata carries every entry in grouped key order (counts and sizes, then the boolean flags) */
         self::assertSame([
@@ -186,7 +186,7 @@ final class PageTest extends TestCase
         );
 
         /** @And a page on that first page */
-        $page = $criteria->page(total: 480, items: []);
+        $page = $criteria->page(items: [], total: 480);
 
         /** @When reading the relations of the navigation targets */
         $relations = $page->navigation()->targets()
@@ -205,7 +205,7 @@ final class PageTest extends TestCase
         );
 
         /** @And a page built over items keyed by their positions */
-        $page = $criteria->page(total: 480, items: [5 => 'a', 9 => 'b']);
+        $page = $criteria->page(items: [5 => 'a', 9 => 'b'], total: 480);
 
         /** @When rendering the page as a JSON:API response over the orders base URI */
         $response = $page->toResponse(baseUri: '/v1/orders');
@@ -248,7 +248,7 @@ final class PageTest extends TestCase
         );
 
         /** @When building the page from the total element count */
-        $page = $criteria->page(total: 480, items: ['a', 'b']);
+        $page = $criteria->page(items: ['a', 'b'], total: 480);
 
         /** @Then the current page number is preserved */
         self::assertSame(3, $page->currentPage());
@@ -272,25 +272,6 @@ final class PageTest extends TestCase
         self::assertSame(24, $page->last()?->page());
     }
 
-    public function testNavigationWhenMiddlePageGivenThenListsFirstPreviousNextAndLastTargets(): void
-    {
-        /** @Given a criteria on a middle page of a multi-page result */
-        $criteria = Criteria::fromQuery(
-            request: Query::from(parameters: ['page' => ['number' => '3', 'size' => '20']])
-        );
-
-        /** @And a page on that middle page */
-        $page = $criteria->page(total: 480, items: []);
-
-        /** @When reading the relations of the navigation targets */
-        $relations = $page->navigation()->targets()
-            ->map(transformations: static fn(NavigationTarget $target): string => $target->relation()->value)
-            ->toArray(keyPreservation: KeyPreservation::DISCARD);
-
-        /** @Then it lists the first, previous, next, and last relations in semantic order */
-        self::assertSame(['first', 'prev', 'next', 'last'], $relations);
-    }
-
     public function testNavigationWhenMiddlePageGivenThenTheFirstTargetPointsAtTheFirstPage(): void
     {
         /** @Given a criteria on a middle page of a multi-page result */
@@ -299,7 +280,7 @@ final class PageTest extends TestCase
         );
 
         /** @And a page on that middle page */
-        $page = $criteria->page(total: 480, items: []);
+        $page = $criteria->page(items: [], total: 480);
 
         /** @When reading the first navigation target */
         $target = $page->navigation()->targets()->first();
@@ -309,5 +290,24 @@ final class PageTest extends TestCase
             NavigationTarget::to(target: Pagination::fromPage(page: 1, perPage: 20), relation: LinkRelation::FIRST),
             $target
         );
+    }
+
+    public function testNavigationWhenMiddlePageGivenThenListsFirstPreviousNextAndLastTargets(): void
+    {
+        /** @Given a criteria on a middle page of a multi-page result */
+        $criteria = Criteria::fromQuery(
+            request: Query::from(parameters: ['page' => ['number' => '3', 'size' => '20']])
+        );
+
+        /** @And a page on that middle page */
+        $page = $criteria->page(items: [], total: 480);
+
+        /** @When reading the relations of the navigation targets */
+        $relations = $page->navigation()->targets()
+            ->map(transformations: static fn(NavigationTarget $target): string => $target->relation()->value)
+            ->toArray(keyPreservation: KeyPreservation::DISCARD);
+
+        /** @Then it lists the first, previous, next, and last relations in semantic order */
+        self::assertSame(['first', 'prev', 'next', 'last'], $relations);
     }
 }

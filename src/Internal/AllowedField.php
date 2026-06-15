@@ -24,11 +24,6 @@ final readonly class AllowedField
         return new AllowedField(kind: $kind, field: $field, values: $values, operators: $operators);
     }
 
-    public function hasField(string $field): bool
-    {
-        return $this->field === $field;
-    }
-
     public function permit(Comparison $comparison): Comparison
     {
         if (!in_array($comparison->operator(), $this->operators, true)) {
@@ -46,5 +41,10 @@ final readonly class AllowedField
         }
 
         return $comparison;
+    }
+
+    public function hasField(string $field): bool
+    {
+        return $this->field === $field;
     }
 }

@@ -31,8 +31,8 @@ final readonly class Page
      */
     private function __construct(
         private Sort $sort,
-        private Total $total,
         private Collection $items,
+        private Total $total,
         private Filter $filter,
         private OffsetNavigation $paging,
         private PageCount $pageCount,
@@ -52,7 +52,7 @@ final readonly class Page
      * @return Page<TElement> The page carrying the items, the total, and the navigation.
      * @throws TotalIsNegative If the total is less than 0.
      */
-    public static function from(Sort $sort, int $total, iterable $items, Filter $filter, Pagination $pagination): Page
+    public static function from(Sort $sort, iterable $items, int $total, Filter $filter, Pagination $pagination): Page
     {
         $count = Total::from(value: $total);
         $limit = Limit::from(value: $pagination->limit());
@@ -64,8 +64,8 @@ final readonly class Page
 
         return new Page(
             sort: $sort,
-            total: $count,
             items: $collection,
+            total: $count,
             filter: $filter,
             paging: OffsetNavigation::from(
                 hasNext: $pageCount->hasPageAfter(page: $pageNumber),
@@ -197,8 +197,8 @@ final readonly class Page
     public function toResponse(string $baseUri): ResponseInterface
     {
         return Rendering::of(
-            sort: $this->sort,
             self: $this->pagination,
+            sort: $this->sort,
             items: $this->items,
             filter: $this->filter,
             baseUri: $baseUri,

@@ -105,18 +105,6 @@ final class PaginationTest extends TestCase
         self::assertSame(20, $pagination->limit());
     }
 
-    public function testToQueryStringWhenPageGivenThenRendersPageNumberAndSize(): void
-    {
-        /** @Given an offset pagination on the third page */
-        $pagination = Pagination::fromPage(page: 3, perPage: 20);
-
-        /** @When rendering it as a query string */
-        $queryString = $pagination->toQueryString();
-
-        /** @Then it renders the page number and the page size in the JSON:API page family */
-        self::assertSame('page[number]=3&page[size]=20', $queryString);
-    }
-
     public function testFromPageWhenPageBelowOneGivenThenPageNumberOutOfRange(): void
     {
         /** @Then an exception indicating the page number is out of range is raised */
@@ -155,5 +143,17 @@ final class PaginationTest extends TestCase
 
         /** @When building a pagination from a page size below one */
         Pagination::fromPage(page: 1, perPage: 0);
+    }
+
+    public function testToQueryStringWhenPageGivenThenRendersPageNumberAndSize(): void
+    {
+        /** @Given an offset pagination on the third page */
+        $pagination = Pagination::fromPage(page: 3, perPage: 20);
+
+        /** @When rendering it as a query string */
+        $queryString = $pagination->toQueryString();
+
+        /** @Then it renders the page number and the page size in the JSON:API page family */
+        self::assertSame('page[number]=3&page[size]=20', $queryString);
     }
 }

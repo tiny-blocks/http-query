@@ -20,14 +20,6 @@ final class Renderer
         return Renderer::expressionOf(filter: $filter)->value();
     }
 
-    private static function expressionOf(Filter $filter): Expression
-    {
-        return match (true) {
-            $filter instanceof Group      => Renderer::grouped(group: $filter),
-            $filter instanceof Comparison => Renderer::atomic(comparison: $filter)
-        };
-    }
-
     private static function atomic(Comparison $comparison): Expression
     {
         /** @var Collection<string> $values */
@@ -66,5 +58,13 @@ final class Renderer
             ->joinToString(separator: $operator->value);
 
         return Expression::grouped(value: $value, connective: $operator);
+    }
+
+    private static function expressionOf(Filter $filter): Expression
+    {
+        return match (true) {
+            $filter instanceof Group      => Renderer::grouped(group: $filter),
+            $filter instanceof Comparison => Renderer::atomic(comparison: $filter)
+        };
     }
 }

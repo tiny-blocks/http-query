@@ -18,7 +18,7 @@ final readonly class Seek
      * @param Window<TValue> $window
      * @param Closure(TValue): list<mixed> $keysOf
      */
-    private function __construct(private Window $window, private Closure $keysOf)
+    private function __construct(private Closure $keysOf, private Window $window)
     {
     }
 
@@ -28,12 +28,12 @@ final readonly class Seek
      * @param Closure(TElement): list<mixed> $keysOf
      * @return Seek<TElement>
      */
-    public static function from(int $limit, Collection $items, Closure $keysOf): Seek
+    public static function from(Collection $items, int $limit, Closure $keysOf): Seek
     {
         /** @var Window<TElement> $window */
-        $window = Window::from(limit: $limit, items: $items);
+        $window = Window::from(items: $items, limit: $limit);
 
-        return new Seek(window: $window, keysOf: $keysOf);
+        return new Seek(keysOf: $keysOf, window: $window);
     }
 
     public function next(): Token

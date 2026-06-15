@@ -20,15 +20,15 @@ final class Rendering
     }
 
     public static function of(
-        Sort $sort,
         Pagination $self,
+        Sort $sort,
         Collection $items,
         Filter $filter,
         string $baseUri,
         array $metadata,
         Navigation $navigation
     ): ResponseInterface {
-        $links = Links::from(sort: $sort, self: $self, filter: $filter, baseUri: $baseUri, navigation: $navigation);
+        $links = Links::from(self: $self, sort: $sort, filter: $filter, baseUri: $baseUri, navigation: $navigation);
 
         return Response::ok([
             'data'  => $items->toArray(),

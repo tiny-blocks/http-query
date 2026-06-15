@@ -82,12 +82,12 @@ final readonly class Criteria
      * @return Page<TValue> The offset page carrying the items, the total, and the navigation.
      * @throws TotalIsNegative If the total is less than 0.
      */
-    public function page(int $total, iterable $items): Page
+    public function page(iterable $items, int $total): Page
     {
         return Page::from(
             sort: $this->submittedSort,
-            total: $total,
             items: $items,
+            total: $total,
             filter: $this->filter,
             pagination: $this->pagination
         );
