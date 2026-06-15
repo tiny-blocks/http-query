@@ -113,14 +113,23 @@ final readonly class Schema
      *
      * @param string $field The field the endpoint exposes for filtering.
      * @param list<Operator> $operators The operators permitted for the field.
-     * @param ValueKind|null $kind The kind every value must match, or null to skip the kind check.
-     * @param list<string>|null $values The permitted values, or null to permit any value.
+     * @param ValueKind|null $valueKind The kind every value must match, or null to skip the kind check.
+     * @param list<string>|null $allowedValues The permitted values, or null to permit any value.
      * @return Schema A copy carrying the original contract plus the allowed field.
      */
-    public function filterable(string $field, array $operators, ?ValueKind $kind = null, ?array $values = null): Schema
-    {
+    public function filterable(
+        string $field,
+        array $operators,
+        ?ValueKind $valueKind = null,
+        ?array $allowedValues = null
+    ): Schema {
         return new Schema(
-            allowed: $this->allowed->with(kind: $kind, field: $field, values: $values, operators: $operators),
+            allowed: $this->allowed->with(
+                kind: $valueKind,
+                field: $field,
+                values: $allowedValues,
+                operators: $operators
+            ),
             byDefault: $this->byDefault,
             maxPerPage: $this->maxPerPage,
             defaultPerPage: $this->defaultPerPage,

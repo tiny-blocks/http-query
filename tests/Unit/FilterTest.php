@@ -183,7 +183,7 @@ final class FilterTest extends TestCase
         $schema = Schema::create()->filterable(
             field: 'created_at',
             operators: [Operator::GREATER_THAN],
-            kind: ValueKind::DATETIME
+            valueKind: ValueKind::DATETIME
         );
 
         /** @And a query whose value is not a valid date-time */
@@ -218,7 +218,7 @@ final class FilterTest extends TestCase
         $schema = Schema::create()->filterable(
             field: 'created_at',
             operators: [Operator::GREATER_THAN],
-            kind: ValueKind::DATETIME
+            valueKind: ValueKind::DATETIME
         );
 
         /** @And a query carrying a valid date-time value */
@@ -254,7 +254,7 @@ final class FilterTest extends TestCase
         $schema = Schema::create()->filterable(
             field: 'status',
             operators: [Operator::EQUAL],
-            values: ['paid', 'pending']
+            allowedValues: ['paid', 'pending']
         );
 
         /** @And a query filtering by a value outside the permitted set */
@@ -385,7 +385,7 @@ final class FilterTest extends TestCase
         $schema = Schema::create()->filterable(
             field: 'status',
             operators: [Operator::IN],
-            values: ['paid', 'pending']
+            allowedValues: ['paid', 'pending']
         );
 
         /** @And a query whose IN list carries a value outside the permitted set */

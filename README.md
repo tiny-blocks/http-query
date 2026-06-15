@@ -68,8 +68,8 @@ $schema = Schema::create()
     ->maxPerPage(maxPerPage: 100)
     ->sortable(fields: ['created_at', 'id'])
     ->defaultSort(sort: Sort::fromExpression(expression: '-created_at'))
-    ->filterable(field: 'total', operators: [Operator::GREATER_THAN_OR_EQUAL], kind: ValueKind::INTEGER)
-    ->filterable(field: 'status', operators: [Operator::EQUAL, Operator::IN], values: ['paid', 'pending']);
+    ->filterable(field: 'total', operators: [Operator::GREATER_THAN_OR_EQUAL], valueKind: ValueKind::INTEGER)
+    ->filterable(field: 'status', operators: [Operator::EQUAL, Operator::IN], allowedValues: ['paid', 'pending']);
 
 # GET /v1/orders?filter=status==paid;total=ge=100&sort=-created_at,id&page[number]=3&page[size]=20
 /** @var ServerRequestInterface $request */
