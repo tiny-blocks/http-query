@@ -8,6 +8,7 @@ use Closure;
 use TinyBlocks\HttpQuery\Exceptions\CursorIsInvalid;
 use TinyBlocks\HttpQuery\Filter;
 use TinyBlocks\HttpQuery\Internal\Cursor\SortKeys;
+use TinyBlocks\HttpQuery\Limit;
 use TinyBlocks\HttpQuery\Order;
 use TinyBlocks\HttpQuery\Sort;
 
@@ -68,11 +69,11 @@ final readonly class Keyset
     /**
      * Returns the page size.
      *
-     * @return int The page size.
+     * @return Limit The page size.
      */
-    public function limit(): int
+    public function limit(): Limit
     {
-        return $this->pagination->limit();
+        return Limit::of(size: $this->pagination->limit());
     }
 
     /**

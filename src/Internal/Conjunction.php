@@ -34,6 +34,18 @@ final class Conjunction
         throw FilterShapeNotSupported::from(expression: $expression);
     }
 
+    public static function leaves(Filter $filter): array
+    {
+        if ($filter instanceof Group) {
+            return array_merge(
+                [],
+                ...array_map(static fn(Filter $child): array => Conjunction::leaves(filter: $child), $filter->filters())
+            );
+        }
+
+        return [$filter];
+    }
+
     private static function flatten(Group $group, string $expression): array
     {
         if ($group->operator() !== LogicalOperator::AND) {

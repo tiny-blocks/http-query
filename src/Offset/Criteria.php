@@ -18,6 +18,7 @@ use TinyBlocks\HttpQuery\Exceptions\SortFieldNotAllowed;
 use TinyBlocks\HttpQuery\Exceptions\TotalIsNegative;
 use TinyBlocks\HttpQuery\Filter;
 use TinyBlocks\HttpQuery\Internal\Query;
+use TinyBlocks\HttpQuery\Limit;
 use TinyBlocks\HttpQuery\Schema;
 use TinyBlocks\HttpQuery\Sort;
 
@@ -106,11 +107,11 @@ final readonly class Criteria
     /**
      * Returns the page size.
      *
-     * @return int The page size.
+     * @return Limit The page size.
      */
-    public function limit(): int
+    public function limit(): Limit
     {
-        return $this->pagination->limit();
+        return Limit::of(size: $this->pagination->limit());
     }
 
     /**
@@ -128,6 +129,16 @@ final readonly class Criteria
             filter: $this->filter,
             pagination: $this->pagination
         );
+    }
+
+    /**
+     * Returns the parsed filter tree.
+     *
+     * @return Filter The full filter tree, a comparison or a group of filters.
+     */
+    public function filter(): Filter
+    {
+        return $this->filter;
     }
 
     /**

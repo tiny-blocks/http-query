@@ -57,7 +57,7 @@ final class CriteriaTest extends TestCase
         self::assertSame(0, $criteria->offset());
 
         /** @And the limit carries the default page size */
-        self::assertSame(20, $criteria->limit());
+        self::assertSame(20, $criteria->limit()->toInteger());
     }
 
     public function testSliceWhenBuiltFromRequestThenReturnsOffsetSlice(): void
@@ -84,7 +84,7 @@ final class CriteriaTest extends TestCase
         $criteria = Criteria::fromQuery(request: $query);
 
         /** @Then the limit carries the maximum page size */
-        self::assertSame(100, $criteria->limit());
+        self::assertSame(100, $criteria->limit()->toInteger());
     }
 
     public function testSortWhenClientSortsAllowedFieldsThenReturnsTheClientSort(): void
@@ -127,7 +127,7 @@ final class CriteriaTest extends TestCase
         self::assertSame(5, $criteria->offset());
 
         /** @And the limit carries the schema default page size */
-        self::assertSame(5, $criteria->limit());
+        self::assertSame(5, $criteria->limit()->toInteger());
     }
 
     public function testFromQueryWhenPerPageAboveMaximumThenThrowsPageSizeOutOfRange(): void
@@ -189,7 +189,7 @@ final class CriteriaTest extends TestCase
         self::assertSame(15, $criteria->offset());
 
         /** @And the limit carries the requested page size */
-        self::assertSame(15, $criteria->limit());
+        self::assertSame(15, $criteria->limit()->toInteger());
     }
 
     public function testSortWhenServerControlledAndClientSortsThenThrowsSortFieldNotAllowed(): void

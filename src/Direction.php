@@ -24,4 +24,17 @@ enum Direction: string
             Direction::DESCENDING => '-'
         };
     }
+
+    /**
+     * Returns the strict comparison operator that seeks past the cursor in this direction.
+     *
+     * @return string A greater-than sign when ascending, a less-than sign when descending.
+     */
+    public function seekOperator(): string
+    {
+        return match ($this) {
+            Direction::ASCENDING  => '>',
+            Direction::DESCENDING => '<'
+        };
+    }
 }

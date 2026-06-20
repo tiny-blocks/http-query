@@ -28,7 +28,8 @@ final readonly class Schema
         private Sort $byDefault,
         private int $maxPerPage,
         private int $defaultPerPage,
-        private array $sortableFields
+        private array $sortableFields,
+        private bool $allowsDisjunction
     ) {
         if ($maxPerPage < 1) {
             throw PageSizeOutOfRange::belowMinimum(perPage: $maxPerPage);
@@ -46,7 +47,10 @@ final readonly class Schema
     /**
      * Creates a Schema with an empty contract and the default page-size bounds.
      *
-     * @return Schema The empty schema.
+     * <p>The default page size is 20 and the maximum is 100. No field is filterable or sortable, and
+     * there is no default sort.</p>
+     *
+     * @return Schema The empty schema with a default page size of 20 and a maximum of 100.
      */
     public static function create(): Schema
     {
@@ -56,7 +60,10 @@ final readonly class Schema
     /**
      * Creates a Schema with an empty contract and the default page-size bounds.
      *
-     * @return Schema The default schema.
+     * <p>The default page size is 20 and the maximum is 100. No field is filterable or sortable, and
+     * there is no default sort.</p>
+     *
+     * @return Schema The default schema with a default page size of 20 and a maximum of 100.
      */
     public static function default(): Schema
     {
@@ -65,7 +72,8 @@ final readonly class Schema
             byDefault: Sort::fromExpression(expression: ''),
             maxPerPage: 100,
             defaultPerPage: 20,
-            sortableFields: []
+            sortableFields: [],
+            allowsDisjunction: false
         );
     }
 
@@ -104,7 +112,8 @@ final readonly class Schema
             byDefault: $this->byDefault,
             maxPerPage: $this->maxPerPage,
             defaultPerPage: $this->defaultPerPage,
-            sortableFields: $fields
+            sortableFields: $fields,
+            allowsDisjunction: $this->allowsDisjunction
         );
     }
 
@@ -133,7 +142,8 @@ final readonly class Schema
             byDefault: $this->byDefault,
             maxPerPage: $this->maxPerPage,
             defaultPerPage: $this->defaultPerPage,
-            sortableFields: $this->sortableFields
+            sortableFields: $this->sortableFields,
+            allowsDisjunction: $this->allowsDisjunction
         );
     }
 
@@ -151,7 +161,8 @@ final readonly class Schema
             byDefault: $this->byDefault,
             maxPerPage: $maxPerPage,
             defaultPerPage: $this->defaultPerPage,
-            sortableFields: $this->sortableFields
+            sortableFields: $this->sortableFields,
+            allowsDisjunction: $this->allowsDisjunction
         );
     }
 
@@ -168,7 +179,8 @@ final readonly class Schema
             byDefault: $sort,
             maxPerPage: $this->maxPerPage,
             defaultPerPage: $this->defaultPerPage,
-            sortableFields: $this->sortableFields
+            sortableFields: $this->sortableFields,
+            allowsDisjunction: $this->allowsDisjunction
         );
     }
 
@@ -191,12 +203,17 @@ final readonly class Schema
     }
 
     /**
-     * Returns the validated conjunction of comparisons flattened from the filter.
+     * Returns the validated comparisons read from the filter.
+     *
+     * <p>By default the filter must be a single comparison or an AND group of comparisons, and any
+     * other shape is rejected. When the schema allows disjunction, every comparison leaf of the
+     * filter tree is validated regardless of the connective, and the consumer reads the tree from
+     * <code>Criteria::filter()</code> to render it.</p>
      *
      * @param Filter $filter The incoming filter parsed from the request.
      * @param string $expression The raw filter query string, rendered in shape-violation messages.
      * @return list<Comparison> The validated comparison leaves in filter order.
-     * @throws FilterShapeNotSupported If the filter is not a comparison or an AND group of comparisons.
+     * @throws FilterShapeNotSupported If disjunction is not allowed and the filter is not an AND group.
      * @throws FilterFieldNotAllowed If a comparison targets a field that was never allowed.
      * @throws FilterOperatorNotAllowed If a comparison uses an operator not allowed for its field.
      * @throws FilterValueNotAllowed If a compared value falls outside the permitted set or kind.
@@ -204,7 +221,9 @@ final readonly class Schema
     public function comparisonsFor(Filter $filter, string $expression): array
     {
         /** @var list<Comparison> $comparisons */
-        $comparisons = Conjunction::from(filter: $filter, expression: $expression);
+        $comparisons = $this->allowsDisjunction
+            ? Conjunction::leaves(filter: $filter)
+            : Conjunction::from(filter: $filter, expression: $expression);
 
         return array_map(
             fn(Comparison $comparison): Comparison => $this->allowed->permit(comparison: $comparison),
@@ -226,7 +245,25 @@ final readonly class Schema
             byDefault: $this->byDefault,
             maxPerPage: $this->maxPerPage,
             defaultPerPage: $defaultPerPage,
-            sortableFields: $this->sortableFields
+            sortableFields: $this->sortableFields,
+            allowsDisjunction: $this->allowsDisjunction
+        );
+    }
+
+    /**
+     * Returns a copy of the Schema accepting OR groups and nested groups in the filter.
+     *
+     * @return Schema A copy that no longer rejects a disjunction in the filter shape.
+     */
+    public function allowDisjunction(): Schema
+    {
+        return new Schema(
+            allowed: $this->allowed,
+            byDefault: $this->byDefault,
+            maxPerPage: $this->maxPerPage,
+            defaultPerPage: $this->defaultPerPage,
+            sortableFields: $this->sortableFields,
+            allowsDisjunction: true
         );
     }
 }

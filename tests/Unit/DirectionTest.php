@@ -48,6 +48,20 @@ final class DirectionTest extends TestCase
         self::assertSame($prefix, $actual);
     }
 
+    #[DataProvider('seekOperatorCases')]
+    public function testSeekOperatorWhenCaseGivenThenReturnsTheStrictComparison(
+        string $operator,
+        Direction $direction
+    ): void {
+        /** @Given a sort direction and its strict seek comparison operator */
+
+        /** @When reading the seek operator */
+        $actual = $direction->seekOperator();
+
+        /** @Then the operator matches the expected comparison */
+        self::assertSame($operator, $actual);
+    }
+
     public static function prefixCases(): array
     {
         return [
@@ -61,6 +75,14 @@ final class DirectionTest extends TestCase
         return [
             'ASCENDING'  => ['direction' => Direction::ASCENDING, 'token' => 'asc'],
             'DESCENDING' => ['direction' => Direction::DESCENDING, 'token' => 'desc']
+        ];
+    }
+
+    public static function seekOperatorCases(): array
+    {
+        return [
+            'ASCENDING'  => ['direction' => Direction::ASCENDING, 'operator' => '>'],
+            'DESCENDING' => ['direction' => Direction::DESCENDING, 'operator' => '<']
         ];
     }
 }

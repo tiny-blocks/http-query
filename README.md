@@ -10,6 +10,7 @@
     + [Sorting](#sorting)
     + [Offset pagination](#offset-pagination)
     + [Cursor pagination](#cursor-pagination)
+    + [Building the store query](#building-the-store-query)
     + [Rendering navigation links](#rendering-navigation-links)
 * [FAQ](#faq)
 * [License](#license)
@@ -113,19 +114,22 @@ foreach ($criteria->comparisons() as $comparison) {
 
 The supported operators map to their RSQL tokens through the `Operator` enum (`==`, `!=`, `=lt=`, `=gt=`, `=le=`,
 `=ge=`, `=in=`, `=out=`). The logical connectives map through the `LogicalOperator` enum, where `;` (AND) binds tighter
-than `,` (OR), and parentheses group. The library is conjunction-only for the consumer, so the filter must be a single
-comparison or an AND group of comparisons. A malformed expression raises `FilterExpressionIsInvalid`, and anything
-outside the contract raises a dedicated exception, each implementing `HttpQueryException`.
+than `,` (OR), and parentheses group. By default, the filter must be a single comparison or an AND group of comparisons,
+and any other shape raises `FilterShapeNotSupported`. A schema that calls `allowDisjunction` accepts OR groups and
+nested
+groups, validates every leaf the same way, and the consumer then reads the full tree from `Criteria::filter()` to render
+it. A malformed expression raises `FilterExpressionIsInvalid`, and anything outside the contract raises a dedicated
+exception, each implementing `HttpQueryException`.
 
-| Exception                   | Raised when                                                             |
-|-----------------------------|-------------------------------------------------------------------------|
-| `FilterExpressionIsInvalid` | The filter expression cannot be parsed as RSQL.                         |
-| `FilterShapeNotSupported`   | The filter is an OR group, or nests a group, rather than a conjunction. |
-| `FilterFieldNotAllowed`     | A comparison targets a field that was never declared filterable.        |
-| `FilterOperatorNotAllowed`  | A comparison uses an operator not allowed for its field.                |
-| `FilterValueNotAllowed`     | A compared value falls outside the permitted set or the expected kind.  |
+| Exception                   | Raised when                                                                       |
+|-----------------------------|-----------------------------------------------------------------------------------|
+| `FilterExpressionIsInvalid` | The filter expression cannot be parsed as RSQL.                                   |
+| `FilterShapeNotSupported`   | The filter is an OR group or a nested group and the schema disallows disjunction. |
+| `FilterFieldNotAllowed`     | A comparison targets a field that was never declared filterable.                  |
+| `FilterOperatorNotAllowed`  | A comparison uses an operator not allowed for its field.                          |
+| `FilterValueNotAllowed`     | A compared value falls outside the permitted set or the expected kind.            |
 
-`ValueKind` is the kind a value is validated against. For the multi-valued operators (`=in=`, `=out=`) every value is
+`ValueKind` is the kind a value is validated against. For the multivalued operators (`=in=`, `=out=`) every value is
 checked.
 
 | Kind                  | Matches                                                |
@@ -229,9 +233,9 @@ $schema = Schema::create()->sortable(fields: ['created_at', 'id']);
 /** @var ServerRequestInterface $request */
 $keyset = Criteria::fromQuery(request: $request, schema: $schema)->keyset();
 
-$keyset->limit();   # The page size, 20.
-$keyset->orders();  # The list<Order> the seek is ordered by.
-$keyset->cursor();  # ['created_at' => ..., 'id' => ...], null per field on the first page.
+$keyset->limit()->toInteger();  # The page size, 20.
+$keyset->orders();              # The list<Order> the seek is ordered by.
+$keyset->cursor();              # ['created_at' => ..., 'id' => ...], null per field on the first page.
 ```
 
 The seek inputs feed the store query. The consumer fetches one element beyond the page size and hands the rows to
@@ -262,6 +266,106 @@ $cursorPage->map(transformation: static fn(array $row): array => ['id' => $row['
 ```
 
 An invalid cursor token raises `CursorIsInvalid` when it is decoded.
+
+### Building the store query
+
+The library decides what to fetch and hands the consumer typed SQL fragments to apply against its own
+store. It builds no statement: the `SELECT`, the `FROM`, the joins, the `LIMIT`, and the dialect stay
+with the consumer (or its query builder). Every fragment is a `Clause\SqlClause` exposing `sql()`,
+`parameters()`, and `isEmpty()`, so the consumer programs the `WHERE` assembly against one abstraction.
+
+`Clause\FilterColumns` maps each queryable field to its column. It is an immutable fluent builder, with
+`plain`, `boolean`, and `wrapped` shortcuts, and `with` for a custom `FilterColumn`. The same mapping
+feeds the filter, the seek, and the sort.
+
+```php
+<?php
+
+declare(strict_types=1);
+
+use TinyBlocks\HttpQuery\Clause\Every;
+use TinyBlocks\HttpQuery\Clause\FilterColumns;
+use TinyBlocks\HttpQuery\Clause\Filters;
+use TinyBlocks\HttpQuery\Clause\SeekClause;
+use TinyBlocks\HttpQuery\Clause\SortClause;
+use TinyBlocks\HttpQuery\Comparison;
+use TinyBlocks\HttpQuery\Cursor\Keyset;
+
+/** @var Keyset $keyset */
+/** @var list<Comparison> $comparisons The validated comparisons read from Criteria::comparisons(). */
+$columns = FilterColumns::create()
+    ->plain(field: 'status', column: 'pay.status')
+    ->plain(field: 'created_at', column: 'pay.created_at')
+    ->wrapped(field: 'id', column: 'pay.id', binding: 'UUID_TO_BIN(%s)');
+
+# Filters renders the comparisons, SeekClause renders the keyset predicate, both SqlClause.
+$predicate = Every::of(
+    Filters::from(columns: $columns, comparisons: $comparisons),
+    SeekClause::from(keyset: $keyset, columns: $columns)
+);
+
+$sort = SortClause::from(orders: $keyset->orders(), columns: $columns);
+$limit = $keyset->limit()->plusOne();
+
+$where = $predicate->isEmpty() ? '' : sprintf(' WHERE %s', $predicate->sql());
+$sql = sprintf('%s%s ORDER BY %s LIMIT %d', $base, $where, $sort->sql(), $limit->toInteger());
+# Bind $predicate->parameters() and run $sql against your store.
+```
+
+`Clause\Every::of` combines several `SqlClause` predicates, dropping the empty ones, joining the rest
+with `AND`, and merging their parameters. It is itself a `SqlClause`, so a consumer-owned predicate
+(for example a tenant scope) drops into the same combination by implementing `SqlClause`.
+
+`Filters::from` renders a flat list of comparisons joined with `AND`, which fits the default
+conjunction-only contract. When the schema calls `allowDisjunction`, the filter may be an OR group or a
+nested group, so the consumer renders the full tree with `Filters::fromTree(filter: $criteria->filter(),
+columns: $columns)` instead. It walks the tree, joins each group by its own connective, wraps every group
+in parentheses, and threads the placeholder offsets across the whole tree.
+
+`Limit` is the page size value object. `plus` raises it by an amount and `plusOne` raises it by one,
+the extra row a keyset page fetches to detect a next page. `toInteger` reads the value back.
+
+`Filters::from` renders each comparison with the built-in operator mapping (`==`, `!=`, `=in=`,
+`=out=`, `=lt=`, `=gt=`, `=le=`, `=ge=`). To render a shape the built-in mapping does not cover, pass a
+`Clause\OperatorRenderer`. The first renderer that `supports` a comparison's operator renders it,
+otherwise the built-in mapping does.
+
+```php
+<?php
+
+declare(strict_types=1);
+
+use TinyBlocks\HttpQuery\Clause\FilterColumn;
+use TinyBlocks\HttpQuery\Clause\Fragment;
+use TinyBlocks\HttpQuery\Clause\OperatorRenderer;
+use TinyBlocks\HttpQuery\Comparison;
+use TinyBlocks\HttpQuery\Operator;
+
+final readonly class CaseInsensitiveContains implements OperatorRenderer
+{
+    public function render(FilterColumn $column, int $offset, Comparison $comparison): Fragment
+    {
+        $name = sprintf('filter_%d', $offset);
+        $bind = sprintf($column->binding(), sprintf(':%s', $name));
+
+        return Fragment::of(
+            sql: sprintf('LOWER(%s) LIKE LOWER(%s)', $column->column(), $bind),
+            parameters: [$name => sprintf('%%%s%%', $comparison->firstValue())]
+        );
+    }
+
+    public function supports(Operator $operator): bool
+    {
+        return $operator === Operator::EQUAL;
+    }
+}
+
+# Filters::from($columns, $comparisons, new CaseInsensitiveContains());
+```
+
+A custom renderer reuses an existing RSQL operator token (the grammar the `Scanner` accepts is fixed),
+so a comparison the parser already produces is rendered differently. It does not add a new token to the
+filter grammar.
 
 ### Rendering navigation links
 

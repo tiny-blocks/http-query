@@ -108,7 +108,7 @@ final class CriteriaTest extends TestCase
         $keyset = Criteria::fromQuery(request: Query::from(parameters: []), schema: $schema)->keyset();
 
         /** @Then the keyset carries the schema default page size */
-        self::assertSame(5, $keyset->limit());
+        self::assertSame(5, $keyset->limit()->toInteger());
     }
 
     public function testFromQueryWhenCursorPresentThenKeysetCarriesPageSizeAndCursor(): void
@@ -129,7 +129,7 @@ final class CriteriaTest extends TestCase
         $keyset = $criteria->keyset();
 
         /** @Then the keyset carries the requested page size */
-        self::assertSame(10, $keyset->limit());
+        self::assertSame(10, $keyset->limit()->toInteger());
 
         /** @And the keyset decodes the incoming cursor keyed by the sort field */
         self::assertSame(['id' => 5], $keyset->cursor());

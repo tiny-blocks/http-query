@@ -83,6 +83,16 @@ final readonly class Criteria
     }
 
     /**
+     * Returns the parsed filter tree.
+     *
+     * @return Filter The full filter tree, a comparison or a group of filters.
+     */
+    public function filter(): Filter
+    {
+        return $this->filter;
+    }
+
+    /**
      * Creates a Keyset cursor view ordered by the effective sort.
      *
      * <p>It pairs the effective sort with the validated filter and the cursor view. It works whether

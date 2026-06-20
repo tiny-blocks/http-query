@@ -38,7 +38,7 @@ final class KeysetTest extends TestCase
         $limit = $keyset->limit();
 
         /** @Then it returns the requested page size */
-        self::assertSame(15, $limit);
+        self::assertSame(15, $limit->toInteger());
     }
 
     public function testOrdersWhenSortGivenThenReturnsItsOrders(): void
