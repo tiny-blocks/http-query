@@ -1,0 +1,78 @@
+{
+    "name": "tiny-blocks/http-query",
+    "description": "Typed, framework-independent toolkit for HTTP collection queries (RSQL filtering, sorting, and offset and cursor pagination) that never touches a data store.",
+    "license": "MIT",
+    "type": "library",
+    "keywords": [
+        "rsql",
+        "json-api",
+        "http-query",
+        "pagination",
+        "link-header",
+        "query-string",
+        "tiny-blocks",
+        "cursor-pagination"
+    ],
+    "authors": [
+        {
+            "name": "Gustavo Freze de Araujo Santos",
+            "homepage": "https://github.com/gustavofreze"
+        }
+    ],
+    "homepage": "https://github.com/tiny-blocks/http-query",
+    "support": {
+        "issues": "https://github.com/tiny-blocks/http-query/issues",
+        "source": "https://github.com/tiny-blocks/http-query"
+    },
+    "require": {
+        "php": "^8.5",
+        "tiny-blocks/collection": "^2.5",
+        "tiny-blocks/http": "^6.3"
+    },
+    "require-dev": {
+        "ergebnis/composer-normalize": "^2.52",
+        "infection/infection": "^0.33",
+        "nyholm/psr7": "^1.8",
+        "phpstan/phpstan": "^2.2",
+        "phpunit/phpunit": "^13.1",
+        "squizlabs/php_codesniffer": "^4.0"
+    },
+    "minimum-stability": "stable",
+    "prefer-stable": true,
+    "autoload": {
+        "psr-4": {
+            "TinyBlocks\\HttpQuery\\": "src/"
+        }
+    },
+    "autoload-dev": {
+        "psr-4": {
+            "Test\\TinyBlocks\\HttpQuery\\": "tests/"
+        }
+    },
+    "config": {
+        "allow-plugins": {
+            "ergebnis/composer-normalize": true,
+            "infection/extension-installer": true
+        },
+        "sort-packages": true
+    },
+    "scripts": {
+        "configure": [
+            "@composer install --optimize-autoloader",
+            "@composer normalize"
+        ],
+        "configure-and-update": [
+            "@composer update --optimize-autoloader",
+            "@composer normalize"
+        ],
+        "review": [
+            "@php ./vendor/bin/phpcs --standard=phpcs.xml --extensions=php ./src ./tests",
+            "@php ./vendor/bin/phpstan analyse -c phpstan.neon.dist --quiet --no-progress"
+        ],
+        "test-file": "@php ./vendor/bin/phpunit --configuration phpunit.xml --no-coverage --filter",
+        "tests": [
+            "@php -d memory_limit=2G ./vendor/bin/phpunit --configuration phpunit.xml tests",
+            "@php ./vendor/bin/infection --threads=max --logger-html=reports/coverage/mutation-report.html --coverage=reports/coverage"
+        ]
+    }
+}
