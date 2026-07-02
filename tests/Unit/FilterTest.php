@@ -39,7 +39,7 @@ final class FilterTest extends TestCase
         $query = Query::from(parameters: []);
 
         /** @When reading the validated comparisons */
-        $comparisons = Criteria::fromQuery(request: $query, schema: $this->schema)->comparisons();
+        $comparisons = Criteria::fromQuery(schema: $this->schema, request: $query)->comparisons();
 
         /** @Then there is no comparison */
         self::assertSame([], $comparisons);
@@ -51,7 +51,7 @@ final class FilterTest extends TestCase
         $query = Query::from(parameters: ['filter' => 'a==1;b==2']);
 
         /** @When reading the validated comparisons */
-        $comparisons = Criteria::fromQuery(request: $query, schema: $this->schema)->comparisons();
+        $comparisons = Criteria::fromQuery(schema: $this->schema, request: $query)->comparisons();
 
         /** @Then the comparisons carry both leaves in order */
         self::assertEquals([
@@ -66,7 +66,7 @@ final class FilterTest extends TestCase
         $query = Query::from(parameters: ['filter' => 'role=in=(admin,user)']);
 
         /** @When reading the validated comparisons */
-        $comparisons = Criteria::fromQuery(request: $query, schema: $this->schema)->comparisons();
+        $comparisons = Criteria::fromQuery(schema: $this->schema, request: $query)->comparisons();
 
         /** @Then the only comparison is an IN comparison carrying every listed value in order */
         self::assertEquals(
@@ -81,7 +81,7 @@ final class FilterTest extends TestCase
         $query = Query::from(parameters: ['filter' => 'role=out=(a,b)']);
 
         /** @When reading the validated comparisons */
-        $comparisons = Criteria::fromQuery(request: $query, schema: $this->schema)->comparisons();
+        $comparisons = Criteria::fromQuery(schema: $this->schema, request: $query)->comparisons();
 
         /** @Then the only comparison is a NOT_IN comparison carrying every listed value in order */
         self::assertEquals(
@@ -100,7 +100,7 @@ final class FilterTest extends TestCase
         $this->expectExceptionMessage('Filter shape <a==1,b==2> is not supported.');
 
         /** @When building the criteria from the query */
-        Criteria::fromQuery(request: $query, schema: $this->schema);
+        Criteria::fromQuery(schema: $this->schema, request: $query);
     }
 
     public function testFromQueryWhenDoubleQuotedValueThenComparisonStripsQuotes(): void
@@ -109,7 +109,7 @@ final class FilterTest extends TestCase
         $query = Query::from(parameters: ['filter' => 'name=="John Doe"']);
 
         /** @When reading the validated comparisons */
-        $comparisons = Criteria::fromQuery(request: $query, schema: $this->schema)->comparisons();
+        $comparisons = Criteria::fromQuery(schema: $this->schema, request: $query)->comparisons();
 
         /** @Then the comparison carries the value with the surrounding quotes stripped */
         self::assertEquals(
@@ -124,7 +124,7 @@ final class FilterTest extends TestCase
         $query = Query::from(parameters: ['filter' => "name=='John Doe'"]);
 
         /** @When reading the validated comparisons */
-        $comparisons = Criteria::fromQuery(request: $query, schema: $this->schema)->comparisons();
+        $comparisons = Criteria::fromQuery(schema: $this->schema, request: $query)->comparisons();
 
         /** @Then the comparison carries the value with the surrounding quotes stripped */
         self::assertEquals(
@@ -143,7 +143,7 @@ final class FilterTest extends TestCase
         $this->expectExceptionMessage('Filter shape <(a==1,b==2);c==3> is not supported.');
 
         /** @When building the criteria from the query */
-        Criteria::fromQuery(request: $query, schema: $this->schema);
+        Criteria::fromQuery(schema: $this->schema, request: $query);
     }
 
     public function testFromQueryWhenEscapedQuoteInValueThenComparisonKeepsTheQuote(): void
@@ -152,7 +152,7 @@ final class FilterTest extends TestCase
         $query = Query::from(parameters: ['filter' => 'name=="a\\"b"']);
 
         /** @When reading the validated comparisons */
-        $comparisons = Criteria::fromQuery(request: $query, schema: $this->schema)->comparisons();
+        $comparisons = Criteria::fromQuery(schema: $this->schema, request: $query)->comparisons();
 
         /** @Then the comparison carries the value with the escaped quote unescaped */
         self::assertEquals(
@@ -174,7 +174,7 @@ final class FilterTest extends TestCase
         $this->expectExceptionMessage('Filter field <discount> is not allowed.');
 
         /** @When building the criteria from the query */
-        Criteria::fromQuery(request: $query, schema: $schema);
+        Criteria::fromQuery(schema: $schema, request: $query);
     }
 
     public function testFromQueryWhenValueBreaksKindThenThrowsFilterValueNotAllowed(): void
@@ -194,7 +194,7 @@ final class FilterTest extends TestCase
         $this->expectExceptionMessage('does not match the datetime kind');
 
         /** @When building the criteria from the query */
-        Criteria::fromQuery(request: $query, schema: $schema);
+        Criteria::fromQuery(schema: $schema, request: $query);
     }
 
     public function testFromQueryWhenParenthesizedComparisonThenComparisonIsReturned(): void
@@ -203,7 +203,7 @@ final class FilterTest extends TestCase
         $query = Query::from(parameters: ['filter' => '(status==paid)']);
 
         /** @When reading the validated comparisons */
-        $comparisons = Criteria::fromQuery(request: $query, schema: $this->schema)->comparisons();
+        $comparisons = Criteria::fromQuery(schema: $this->schema, request: $query)->comparisons();
 
         /** @Then the only comparison is the unwrapped equality */
         self::assertEquals(
@@ -225,7 +225,7 @@ final class FilterTest extends TestCase
         $query = Query::from(parameters: ['filter' => 'created_at=gt=2023-01-15T10:30:00Z']);
 
         /** @When reading the validated comparisons */
-        $comparisons = Criteria::fromQuery(request: $query, schema: $schema)->comparisons();
+        $comparisons = Criteria::fromQuery(schema: $schema, request: $query)->comparisons();
 
         /** @Then the only comparison carries the date-time value */
         self::assertEquals([Comparison::of(
@@ -245,7 +245,7 @@ final class FilterTest extends TestCase
         $this->expectExceptionMessage('is not supported');
 
         /** @When building the criteria from the query */
-        Criteria::fromQuery(request: $query, schema: $this->schema);
+        Criteria::fromQuery(schema: $this->schema, request: $query);
     }
 
     public function testFromQueryWhenValueNotPermittedThenThrowsFilterValueNotAllowed(): void
@@ -265,7 +265,7 @@ final class FilterTest extends TestCase
         $this->expectExceptionMessage('Value <shipped> is not permitted for filter field <status>.');
 
         /** @When building the criteria from the query */
-        Criteria::fromQuery(request: $query, schema: $schema);
+        Criteria::fromQuery(schema: $schema, request: $query);
     }
 
     public function testFromQueryWhenParenthesizedAndGroupThenComparisonsCarryEveryLeaf(): void
@@ -274,7 +274,7 @@ final class FilterTest extends TestCase
         $query = Query::from(parameters: ['filter' => '(a==1;b==2)']);
 
         /** @When reading the validated comparisons */
-        $comparisons = Criteria::fromQuery(request: $query, schema: $this->schema)->comparisons();
+        $comparisons = Criteria::fromQuery(schema: $this->schema, request: $query)->comparisons();
 
         /** @Then the comparisons carry both leaves in order */
         self::assertEquals([
@@ -289,7 +289,7 @@ final class FilterTest extends TestCase
         $query = Query::from(parameters: ['filter' => 'status==paid']);
 
         /** @When reading the validated comparisons */
-        $comparisons = Criteria::fromQuery(request: $query, schema: $this->schema)->comparisons();
+        $comparisons = Criteria::fromQuery(schema: $this->schema, request: $query)->comparisons();
 
         /** @Then the only comparison is an equality on the named field with its value */
         self::assertEquals(
@@ -307,7 +307,7 @@ final class FilterTest extends TestCase
         $query = Query::from(parameters: ['filter' => $expression]);
 
         /** @When reading the validated comparisons */
-        $comparisons = Criteria::fromQuery(request: $query, schema: $this->schema)->comparisons();
+        $comparisons = Criteria::fromQuery(schema: $this->schema, request: $query)->comparisons();
 
         /** @Then the only comparison carries the expected operator */
         self::assertEquals([Comparison::of(field: 'a', values: ['b'], operator: $expected)], $comparisons);
@@ -326,7 +326,7 @@ final class FilterTest extends TestCase
         $this->expectExceptionMessage('Operator <!=> is not allowed for filter field <status>.');
 
         /** @When building the criteria from the query */
-        Criteria::fromQuery(request: $query, schema: $schema);
+        Criteria::fromQuery(schema: $schema, request: $query);
     }
 
     public function testFromQueryWhenFilterNestedToTheMaximumDepthThenComparisonIsReturned(): void
@@ -340,7 +340,7 @@ final class FilterTest extends TestCase
         ]);
 
         /** @When reading the validated comparisons */
-        $comparisons = Criteria::fromQuery(request: $query, schema: $this->schema)->comparisons();
+        $comparisons = Criteria::fromQuery(schema: $this->schema, request: $query)->comparisons();
 
         /** @Then the deeply nested parentheses collapse to the single unwrapped comparison */
         self::assertEquals(
@@ -355,7 +355,7 @@ final class FilterTest extends TestCase
         $query = Query::from(parameters: ['filter' => 'name=="a\\\\b"']);
 
         /** @When reading the validated comparisons */
-        $comparisons = Criteria::fromQuery(request: $query, schema: $this->schema)->comparisons();
+        $comparisons = Criteria::fromQuery(schema: $this->schema, request: $query)->comparisons();
 
         /** @Then the comparison carries the value with the escaped backslash unescaped */
         self::assertEquals(
@@ -376,7 +376,7 @@ final class FilterTest extends TestCase
         $this->expectExceptionMessage('could not be parsed');
 
         /** @When building the criteria from the query */
-        Criteria::fromQuery(request: $query, schema: $this->schema);
+        Criteria::fromQuery(schema: $this->schema, request: $query);
     }
 
     public function testFromQueryWhenInListHasDisallowedValueThenThrowsFilterValueNotAllowed(): void
@@ -395,7 +395,7 @@ final class FilterTest extends TestCase
         $this->expectException(FilterValueNotAllowed::class);
 
         /** @When building the criteria from the query */
-        Criteria::fromQuery(request: $query, schema: $schema);
+        Criteria::fromQuery(schema: $schema, request: $query);
     }
 
     public function testFromQueryWhenFilterNestedBeyondTheMaximumDepthThenThrowsFilterExpressionIsInvalid(): void
@@ -413,7 +413,7 @@ final class FilterTest extends TestCase
         $this->expectExceptionMessage('could not be parsed');
 
         /** @When building the criteria from the query */
-        Criteria::fromQuery(request: $query, schema: $this->schema);
+        Criteria::fromQuery(schema: $this->schema, request: $query);
     }
 
     public static function comparisonOperatorCases(): array

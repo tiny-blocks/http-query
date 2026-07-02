@@ -61,7 +61,7 @@ final readonly class Keyset
             sort: $this->submittedSort,
             items: $items,
             filter: $this->filter,
-            keysOf: $keysOf ?? SortKeys::from(sort: $this->sort),
+            keysOf: ($keysOf ?? SortKeys::from(sort: $this->sort)),
             pagination: $this->pagination
         );
     }

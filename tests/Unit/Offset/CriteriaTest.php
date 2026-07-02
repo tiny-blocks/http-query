@@ -24,7 +24,7 @@ final class CriteriaTest extends TestCase
         $schema = Schema::create();
 
         /** @When reading the effective sort from a query carrying no sort */
-        $sort = Criteria::fromQuery(request: Query::from(parameters: []), schema: $schema)->sort();
+        $sort = Criteria::fromQuery(schema: $schema, request: Query::from(parameters: []))->sort();
 
         /** @Then the effective sort is empty */
         self::assertTrue($sort->isEmpty());
@@ -33,7 +33,7 @@ final class CriteriaTest extends TestCase
     public function testPageWhenBuiltFromRequestThenReturnsOffsetPage(): void
     {
         /** @Given a criteria parsed from a request carrying a page size of three */
-        $criteria = Criteria::fromQuery(request: Query::from(parameters: ['page' => ['size' => '3']]));
+        $criteria = Criteria::fromQueryWithDefaultSchema(request: Query::from(parameters: ['page' => ['size' => '3']]));
 
         /** @When building an offset page from the total element count and the items */
         $page = $criteria->page(items: ['a', 'b', 'c'], total: 30);
@@ -51,7 +51,7 @@ final class CriteriaTest extends TestCase
         $query = Query::from(parameters: []);
 
         /** @When building the criteria from the query */
-        $criteria = Criteria::fromQuery(request: $query);
+        $criteria = Criteria::fromQueryWithDefaultSchema(request: $query);
 
         /** @Then the offset starts at zero */
         self::assertSame(0, $criteria->offset());
@@ -63,7 +63,7 @@ final class CriteriaTest extends TestCase
     public function testSliceWhenBuiltFromRequestThenReturnsOffsetSlice(): void
     {
         /** @Given a criteria parsed from a request carrying a page size of three */
-        $criteria = Criteria::fromQuery(request: Query::from(parameters: ['page' => ['size' => '3']]));
+        $criteria = Criteria::fromQueryWithDefaultSchema(request: Query::from(parameters: ['page' => ['size' => '3']]));
 
         /** @When building an offset slice from the items fetched for the page size plus one */
         $slice = $criteria->slice(items: ['a', 'b', 'c', 'd']);
@@ -81,7 +81,7 @@ final class CriteriaTest extends TestCase
         $query = Query::from(parameters: ['page' => ['size' => '100']]);
 
         /** @When building the criteria from the query */
-        $criteria = Criteria::fromQuery(request: $query);
+        $criteria = Criteria::fromQueryWithDefaultSchema(request: $query);
 
         /** @Then the limit carries the maximum page size */
         self::assertSame(100, $criteria->limit()->toInteger());
@@ -93,7 +93,7 @@ final class CriteriaTest extends TestCase
         $schema = Schema::create()->sortable(fields: ['created_at', 'id']);
 
         /** @When reading the effective sort from a client sort over both fields */
-        $sort = Criteria::fromQuery(request: Query::from(parameters: ['sort' => '-created_at,id']), schema: $schema)
+        $sort = Criteria::fromQuery(schema: $schema, request: Query::from(parameters: ['sort' => '-created_at,id']))
             ->sort();
 
         /** @Then the effective sort is the client sort */
@@ -106,7 +106,7 @@ final class CriteriaTest extends TestCase
         $schema = Schema::create()->defaultSort(sort: Sort::fromExpression(expression: '-created_at'));
 
         /** @When reading the effective sort from a query carrying no sort */
-        $sort = Criteria::fromQuery(request: Query::from(parameters: []), schema: $schema)->sort();
+        $sort = Criteria::fromQuery(schema: $schema, request: Query::from(parameters: []))->sort();
 
         /** @Then the effective sort is the schema default */
         self::assertEquals(Sort::fromExpression(expression: '-created_at'), $sort);
@@ -121,7 +121,7 @@ final class CriteriaTest extends TestCase
         $schema = Schema::create()->defaultPerPage(defaultPerPage: 5);
 
         /** @When building the criteria from the query and the schema */
-        $criteria = Criteria::fromQuery(request: $query, schema: $schema);
+        $criteria = Criteria::fromQuery(schema: $schema, request: $query);
 
         /** @Then the offset is derived from the requested page and the schema default page size */
         self::assertSame(5, $criteria->offset());
@@ -140,7 +140,7 @@ final class CriteriaTest extends TestCase
         $this->expectExceptionMessage('Page size');
 
         /** @When building the criteria from the query */
-        Criteria::fromQuery(request: $query);
+        Criteria::fromQueryWithDefaultSchema(request: $query);
     }
 
     public function testSortWhenClientSortsDisallowedFieldThenThrowsSortFieldNotAllowed(): void
@@ -156,7 +156,7 @@ final class CriteriaTest extends TestCase
         $this->expectExceptionMessage('Sort field <name> is not allowed.');
 
         /** @When building the criteria from the query */
-        Criteria::fromQuery(request: $query, schema: $schema);
+        Criteria::fromQuery(schema: $schema, request: $query);
     }
 
     public function testFromQueryWhenFilterSortAndPageGivenThenEachSpecificationIsValidated(): void
@@ -174,7 +174,7 @@ final class CriteriaTest extends TestCase
         ]);
 
         /** @When building the criteria from the query and the schema */
-        $criteria = Criteria::fromQuery(request: $query, schema: $schema);
+        $criteria = Criteria::fromQuery(schema: $schema, request: $query);
 
         /** @Then the validated comparisons carry the filtered field and value */
         self::assertEquals(
@@ -204,6 +204,6 @@ final class CriteriaTest extends TestCase
         $this->expectException(SortFieldNotAllowed::class);
 
         /** @When building the criteria from the query */
-        Criteria::fromQuery(request: $query, schema: $schema);
+        Criteria::fromQuery(schema: $schema, request: $query);
     }
 }

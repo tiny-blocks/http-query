@@ -46,7 +46,7 @@ final class LinksTest extends TestCase
     public function testToArrayWhenPageIsTheLastThenOmitsTheNextRelation(): void
     {
         /** @Given a criteria pointing at the twenty-fourth page */
-        $criteria = Criteria::fromQuery(
+        $criteria = Criteria::fromQueryWithDefaultSchema(
             request: Query::from(parameters: ['page' => ['number' => '24', 'size' => '20']])
         );
 
@@ -173,7 +173,7 @@ final class LinksTest extends TestCase
     public function testToArrayWhenPageIsTheFirstThenOmitsThePreviousRelation(): void
     {
         /** @Given a criteria pointing at the first page */
-        $criteria = Criteria::fromQuery(
+        $criteria = Criteria::fromQueryWithDefaultSchema(
             request: Query::from(parameters: ['page' => ['number' => '1', 'size' => '20']])
         );
 
@@ -204,7 +204,7 @@ final class LinksTest extends TestCase
     public function testToArrayWhenSliceMiddleThenExposesSelfFirstPrevAndNext(): void
     {
         /** @Given a criteria at a middle page */
-        $criteria = Criteria::fromQuery(
+        $criteria = Criteria::fromQueryWithDefaultSchema(
             request: Query::from(parameters: ['page' => ['number' => '3', 'size' => '20']])
         );
 
@@ -256,7 +256,7 @@ final class LinksTest extends TestCase
     public function testToArrayWhenSliceMiddleThenCarriesAFirstButNoLastRelation(): void
     {
         /** @Given a criteria pointing at a middle page */
-        $criteria = Criteria::fromQuery(
+        $criteria = Criteria::fromQueryWithDefaultSchema(
             request: Query::from(parameters: ['page' => ['number' => '3', 'size' => '20']])
         );
 
@@ -318,7 +318,7 @@ final class LinksTest extends TestCase
     public function testToHeaderWhenPageInTheMiddleThenFoldsEveryRelationIntoOneCommaJoinedValue(): void
     {
         /** @Given a criteria at a middle page */
-        $criteria = Criteria::fromQuery(
+        $criteria = Criteria::fromQueryWithDefaultSchema(
             request: Query::from(parameters: ['page' => ['number' => '3', 'size' => '20']])
         );
 
@@ -347,7 +347,7 @@ final class LinksTest extends TestCase
     public function testToArrayWhenPageInTheMiddleThenExposesEveryRelationPreservingFilterAndSort(): void
     {
         /** @Given a criteria at a middle page */
-        $criteria = Criteria::fromQuery(
+        $criteria = Criteria::fromQueryWithDefaultSchema(
             request: Query::from(parameters: ['page' => ['number' => '3', 'size' => '20']])
         );
 

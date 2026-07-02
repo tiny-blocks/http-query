@@ -5,7 +5,6 @@ declare(strict_types=1);
 namespace TinyBlocks\HttpQuery\Exceptions;
 
 use InvalidArgumentException;
-use TinyBlocks\HttpQuery\Schema;
 
 /**
  * Raised when a requested page size falls outside the valid range.

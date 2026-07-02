@@ -24,7 +24,7 @@ final class Scanner
 
     public function peek(): string
     {
-        return $this->input[$this->position] ?? '';
+        return ($this->input[$this->position] ?? '');
     }
 
     public function value(): string
@@ -58,7 +58,7 @@ final class Scanner
             $character = $this->input[$this->position];
 
             if ($character === '\\') {
-                $characters[] = $this->input[$this->position + 1] ?? '';
+                $characters[] = ($this->input[($this->position + 1)] ?? '');
                 $this->position += 2;
                 continue;
             }
@@ -107,7 +107,7 @@ final class Scanner
             $this->position++;
         }
 
-        $token = substr($this->input, $start, $this->position - $start);
+        $token = substr($this->input, $start, ($this->position - $start));
 
         if ($token === '') {
             throw FilterExpressionIsInvalid::from(expression: $this->input);

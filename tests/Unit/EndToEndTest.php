@@ -30,7 +30,7 @@ final class EndToEndTest extends TestCase
         ]);
 
         /** @And the criteria parsed from those parameters */
-        $criteria = OffsetCriteria::fromQuery(request: $query, schema: $schema);
+        $criteria = OffsetCriteria::fromQuery(schema: $schema, request: $query);
 
         /** @And the base URI the navigation links render against */
         $base = '/v1/orders?filter=status==paid;total=ge=100&sort=-created_at,id';
@@ -74,7 +74,7 @@ final class EndToEndTest extends TestCase
         $query = Query::from(parameters: ['sort' => 'id', 'page' => ['cursor' => $token, 'size' => '2']]);
 
         /** @And a cursor page built through the keyset view over the array rows fetched */
-        $page = CursorCriteria::fromQuery(request: $query, schema: $schema)
+        $page = CursorCriteria::fromQuery(schema: $schema, request: $query)
             ->keyset()
             ->page(items: [['id' => 10], ['id' => 20], ['id' => 30]]);
 
@@ -114,7 +114,7 @@ final class EndToEndTest extends TestCase
         ]);
 
         /** @And the criteria parsed from those parameters */
-        $criteria = OffsetCriteria::fromQuery(request: $query, schema: $schema);
+        $criteria = OffsetCriteria::fromQuery(schema: $schema, request: $query);
 
         /** @And the base URI the relations render against */
         $base = '/v1/orders?filter=status==paid;total=ge=100&sort=-created_at,id';

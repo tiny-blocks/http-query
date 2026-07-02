@@ -18,7 +18,7 @@ final class PageTest extends TestCase
     public function testNavigationWhenTotalIsZeroThenThereIsNoPage(): void
     {
         /** @Given a criteria on the first page */
-        $criteria = Criteria::fromQuery(
+        $criteria = Criteria::fromQueryWithDefaultSchema(
             request: Query::from(parameters: ['page' => ['number' => '1', 'size' => '20']])
         );
 
@@ -51,7 +51,7 @@ final class PageTest extends TestCase
     public function testNavigationWhenLastPageGivenThenHasNoNextPage(): void
     {
         /** @Given a criteria on the last page */
-        $criteria = Criteria::fromQuery(
+        $criteria = Criteria::fromQueryWithDefaultSchema(
             request: Query::from(parameters: ['page' => ['number' => '24', 'size' => '20']])
         );
 
@@ -74,7 +74,7 @@ final class PageTest extends TestCase
     public function testItemsWhenPageGivenThenCarriesTheProvidedItems(): void
     {
         /** @Given a criteria on the third page with a page size of twenty */
-        $criteria = Criteria::fromQuery(
+        $criteria = Criteria::fromQueryWithDefaultSchema(
             request: Query::from(parameters: ['page' => ['number' => '3', 'size' => '20']])
         );
 
@@ -88,7 +88,7 @@ final class PageTest extends TestCase
     public function testFromWhenTotalIsNegativeThenThrowsTotalIsNegative(): void
     {
         /** @Given a criteria on the first page */
-        $criteria = Criteria::fromQuery(
+        $criteria = Criteria::fromQueryWithDefaultSchema(
             request: Query::from(parameters: ['page' => ['number' => '1', 'size' => '20']])
         );
 
@@ -103,7 +103,7 @@ final class PageTest extends TestCase
     public function testNavigationWhenFirstPageGivenThenHasNoPreviousPage(): void
     {
         /** @Given a criteria on the first page */
-        $criteria = Criteria::fromQuery(
+        $criteria = Criteria::fromQueryWithDefaultSchema(
             request: Query::from(parameters: ['page' => ['number' => '1', 'size' => '20']])
         );
 
@@ -132,7 +132,7 @@ final class PageTest extends TestCase
     public function testTotalWhenPageGivenThenReturnsTheTotalElementCount(): void
     {
         /** @Given a criteria on the first page with a page size of twenty */
-        $criteria = Criteria::fromQuery(
+        $criteria = Criteria::fromQueryWithDefaultSchema(
             request: Query::from(parameters: ['page' => ['number' => '1', 'size' => '20']])
         );
 
@@ -146,7 +146,7 @@ final class PageTest extends TestCase
     public function testTotalPagesWhenTotalIsNotAMultipleOfPerPageThenRoundsUp(): void
     {
         /** @Given a criteria on the first page with a page size of twenty */
-        $criteria = Criteria::fromQuery(
+        $criteria = Criteria::fromQueryWithDefaultSchema(
             request: Query::from(parameters: ['page' => ['number' => '1', 'size' => '20']])
         );
 
@@ -160,7 +160,7 @@ final class PageTest extends TestCase
     public function testMetadataWhenMiddlePageGivenThenCarriesEveryFlagAndCount(): void
     {
         /** @Given a criteria on a middle page with a page size of twenty */
-        $criteria = Criteria::fromQuery(
+        $criteria = Criteria::fromQueryWithDefaultSchema(
             request: Query::from(parameters: ['page' => ['number' => '3', 'size' => '20']])
         );
 
@@ -181,7 +181,7 @@ final class PageTest extends TestCase
     public function testNavigationWhenFirstPageGivenThenOmitsThePreviousRelation(): void
     {
         /** @Given a criteria on the first page of a multi-page result */
-        $criteria = Criteria::fromQuery(
+        $criteria = Criteria::fromQueryWithDefaultSchema(
             request: Query::from(parameters: ['page' => ['number' => '1', 'size' => '20']])
         );
 
@@ -200,7 +200,7 @@ final class PageTest extends TestCase
     public function testToResponseWhenMiddlePageGivenThenRendersBodyAndLinkHeader(): void
     {
         /** @Given a criteria on the third page with a page size of twenty */
-        $criteria = Criteria::fromQuery(
+        $criteria = Criteria::fromQueryWithDefaultSchema(
             request: Query::from(parameters: ['page' => ['number' => '3', 'size' => '20']])
         );
 
@@ -243,7 +243,7 @@ final class PageTest extends TestCase
     public function testNavigationWhenMiddlePageGivenThenExposesEverySurroundingPage(): void
     {
         /** @Given a criteria on a middle page with a page size of twenty */
-        $criteria = Criteria::fromQuery(
+        $criteria = Criteria::fromQueryWithDefaultSchema(
             request: Query::from(parameters: ['page' => ['number' => '3', 'size' => '20']])
         );
 
@@ -275,7 +275,7 @@ final class PageTest extends TestCase
     public function testNavigationWhenMiddlePageGivenThenTheFirstTargetPointsAtTheFirstPage(): void
     {
         /** @Given a criteria on a middle page of a multi-page result */
-        $criteria = Criteria::fromQuery(
+        $criteria = Criteria::fromQueryWithDefaultSchema(
             request: Query::from(parameters: ['page' => ['number' => '3', 'size' => '20']])
         );
 
@@ -295,7 +295,7 @@ final class PageTest extends TestCase
     public function testNavigationWhenMiddlePageGivenThenListsFirstPreviousNextAndLastTargets(): void
     {
         /** @Given a criteria on a middle page of a multi-page result */
-        $criteria = Criteria::fromQuery(
+        $criteria = Criteria::fromQueryWithDefaultSchema(
             request: Query::from(parameters: ['page' => ['number' => '3', 'size' => '20']])
         );
 

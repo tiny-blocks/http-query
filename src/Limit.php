@@ -32,7 +32,7 @@ final readonly class Limit
      */
     public function plus(int $extra): Limit
     {
-        return new Limit(size: $this->size + $extra);
+        return new Limit(size: ($this->size + $extra));
     }
 
     /**

@@ -64,7 +64,7 @@ final readonly class FilterParser
             }
 
             $this->scanner->expect(character: '(');
-            $group = $this->disjunction(depth: $depth + 1);
+            $group = $this->disjunction(depth: ($depth + 1));
             $this->scanner->expect(character: ')');
 
             return $group;
