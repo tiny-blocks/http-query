@@ -31,9 +31,9 @@ final readonly class Query
         $parameters = QueryParameters::from(request: $request);
         $page = $parameters->get(key: 'page')->toArray();
 
-        $size = Attribute::from(value: $page['size'] ?? null);
-        $cursor = Attribute::from(value: $page['cursor'] ?? null);
-        $number = Attribute::from(value: $page['number'] ?? null);
+        $size = Attribute::from(value: ($page['size'] ?? null));
+        $cursor = Attribute::from(value: ($page['cursor'] ?? null));
+        $number = Attribute::from(value: ($page['number'] ?? null));
 
         $expression = $parameters->get(key: 'filter')->toString();
         $filter = $expression === '' ? Group::none() : FilterParser::from(input: $expression)->parse();

@@ -29,7 +29,7 @@ final class DisjunctionTest extends TestCase
         $query = Query::from(parameters: ['filter' => 'a==1,b==2']);
 
         /** @When building the cursor criteria */
-        $criteria = CursorCriteria::fromQuery(request: $query, schema: $schema);
+        $criteria = CursorCriteria::fromQuery(schema: $schema, request: $query);
 
         /** @Then the filter tree is the OR group */
         self::assertEquals(
@@ -57,7 +57,7 @@ final class DisjunctionTest extends TestCase
         $query = Query::from(parameters: ['filter' => '(a==1,b==2);c==3']);
 
         /** @When building the criteria */
-        $criteria = OffsetCriteria::fromQuery(request: $query, schema: $schema);
+        $criteria = OffsetCriteria::fromQuery(schema: $schema, request: $query);
 
         /** @Then every nested leaf is validated and returned in tree order */
         self::assertEquals(
@@ -85,7 +85,7 @@ final class DisjunctionTest extends TestCase
         $this->expectExceptionMessage('Filter field <discount> is not allowed.');
 
         /** @When building the criteria */
-        OffsetCriteria::fromQuery(request: $query, schema: $schema);
+        OffsetCriteria::fromQuery(schema: $schema, request: $query);
     }
 
     public function testOffsetWhenDisjunctionAllowedThenAcceptsTheOrGroupAndExposesTheTree(): void
@@ -100,7 +100,7 @@ final class DisjunctionTest extends TestCase
         $query = Query::from(parameters: ['filter' => 'a==1,b==2']);
 
         /** @When building the offset criteria */
-        $criteria = OffsetCriteria::fromQuery(request: $query, schema: $schema);
+        $criteria = OffsetCriteria::fromQuery(schema: $schema, request: $query);
 
         /** @Then the filter tree is the OR group and the comparisons carry every validated leaf */
         self::assertEquals(

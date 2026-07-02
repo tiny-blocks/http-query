@@ -18,8 +18,8 @@ final class SeekClauseTest extends TestCase
     {
         /** @Given a keyset over a sort with no incoming cursor */
         $keyset = Criteria::fromQuery(
-            request: Query::from(parameters: ['sort' => '-created_at,id', 'page' => ['size' => '2']]),
-            schema: Schema::create()->sortable(fields: ['id', 'created_at'])
+            schema: Schema::create()->sortable(fields: ['id', 'created_at']),
+            request: Query::from(parameters: ['sort' => '-created_at,id', 'page' => ['size' => '2']])
         )->keyset();
 
         /** @When the seek predicate is assembled */
@@ -43,10 +43,10 @@ final class SeekClauseTest extends TestCase
 
         /** @And a keyset descending by creation time then ascending by identifier following the cursor */
         $keyset = Criteria::fromQuery(
+            schema: Schema::create()->sortable(fields: ['id', 'created_at']),
             request: Query::from(
                 parameters: ['sort' => '-created_at,id', 'page' => ['cursor' => $token, 'size' => '2']]
-            ),
-            schema: Schema::create()->sortable(fields: ['id', 'created_at'])
+            )
         )->keyset();
 
         /** @When the seek predicate is assembled */
@@ -81,10 +81,10 @@ final class SeekClauseTest extends TestCase
 
         /** @And a keyset descending by that single field following the cursor */
         $keyset = Criteria::fromQuery(
+            schema: Schema::create()->sortable(fields: ['created_at']),
             request: Query::from(
                 parameters: ['sort' => '-created_at', 'page' => ['cursor' => $token, 'size' => '2']]
-            ),
-            schema: Schema::create()->sortable(fields: ['created_at'])
+            )
         )->keyset();
 
         /** @When the seek predicate is assembled */

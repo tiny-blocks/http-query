@@ -24,12 +24,12 @@ final readonly class PageNumber
 
     public static function fromOffset(Limit $limit, Offset $offset): PageNumber
     {
-        return new PageNumber(value: intdiv($offset->value(), $limit->value()) + 1);
+        return new PageNumber(value: (intdiv($offset->value(), $limit->value()) + 1));
     }
 
     public function next(): PageNumber
     {
-        return new PageNumber(value: $this->value + 1);
+        return new PageNumber(value: ($this->value + 1));
     }
 
     public function value(): int
@@ -44,6 +44,6 @@ final readonly class PageNumber
 
     public function previous(): ?PageNumber
     {
-        return $this->isFirst() ? null : new PageNumber(value: $this->value - 1);
+        return $this->isFirst() ? null : new PageNumber(value: ($this->value - 1));
     }
 }

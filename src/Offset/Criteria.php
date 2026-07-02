@@ -42,14 +42,13 @@ final readonly class Criteria
     }
 
     /**
-     * Creates a Criteria from the request and an optional schema.
+     * Creates a Criteria from the schema and the request.
      *
-     * <p>When the schema is omitted, an empty contract applies: the default page-size bounds, no
-     * filterable or sortable field, and no default sort. Any incoming filter or sort is then
-     * rejected. The pagination derives its offset from the one-based page number and the page size.</p>
+     * <p>It parses the request query string and validates it against the schema. The pagination
+     * derives its offset from the one-based page number and the page size.</p>
      *
+     * @param Schema $schema The query contract the request is validated against.
      * @param ServerRequestInterface $request The incoming PSR-7 server request.
-     * @param Schema|null $schema The query contract, or null for the empty contract.
      * @return Criteria The criteria carrying the validated comparisons, the effective sort, and the pagination.
      * @throws FilterExpressionIsInvalid If the filter expression cannot be parsed.
      * @throws SortExpressionIsInvalid If the sort expression cannot be parsed.
@@ -61,9 +60,9 @@ final readonly class Criteria
      * @throws FilterValueNotAllowed If a compared value falls outside the permitted set or kind.
      * @throws SortFieldNotAllowed If the sort orders by a field that was never declared sortable.
      */
-    public static function fromQuery(ServerRequestInterface $request, ?Schema $schema = null): Criteria
+    public static function fromQuery(Schema $schema, ServerRequestInterface $request): Criteria
     {
-        $query = Query::from(schema: $schema ?? Schema::default(), request: $request);
+        $query = Query::from(schema: $schema, request: $request);
 
         return new Criteria(
             sort: $query->sort(),
@@ -72,6 +71,28 @@ final readonly class Criteria
             comparisons: $query->comparisons(),
             submittedSort: $query->submittedSort()
         );
+    }
+
+    /**
+     * Creates a Criteria from the request under the default schema.
+     *
+     * <p>The default schema is an empty contract: the default page-size bounds, no filterable or
+     * sortable field, and no default sort. Any incoming filter or sort is then rejected, and the
+     * pagination derives its offset from the one-based page number and the page size.</p>
+     *
+     * @param ServerRequestInterface $request The incoming PSR-7 server request.
+     * @return Criteria The criteria carrying the validated comparisons, the effective sort, and the pagination.
+     * @throws FilterExpressionIsInvalid If the filter expression cannot be parsed.
+     * @throws SortExpressionIsInvalid If the sort expression cannot be parsed.
+     * @throws PageNumberOutOfRange If the page number is less than 1.
+     * @throws PageSizeOutOfRange If the page size falls outside the valid range.
+     * @throws FilterShapeNotSupported If the filter is not a comparison or an AND group of comparisons.
+     * @throws FilterFieldNotAllowed If a comparison targets a field that was never allowed.
+     * @throws SortFieldNotAllowed If the sort orders by a field that was never declared sortable.
+     */
+    public static function fromQueryWithDefaultSchema(ServerRequestInterface $request): Criteria
+    {
+        return Criteria::fromQuery(schema: Schema::default(), request: $request);
     }
 
     /**

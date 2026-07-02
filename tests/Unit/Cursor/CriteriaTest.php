@@ -24,7 +24,7 @@ final class CriteriaTest extends TestCase
         $query = Query::from(parameters: []);
 
         /** @When building the criteria from the query */
-        $criteria = Criteria::fromQuery(request: $query);
+        $criteria = Criteria::fromQueryWithDefaultSchema(request: $query);
 
         /** @Then the effective sort is empty */
         self::assertTrue($criteria->sort()->isEmpty());
@@ -36,7 +36,7 @@ final class CriteriaTest extends TestCase
         $query = Query::from(parameters: []);
 
         /** @When building the criteria from the query */
-        $criteria = Criteria::fromQuery(request: $query);
+        $criteria = Criteria::fromQueryWithDefaultSchema(request: $query);
 
         /** @Then there is no comparison */
         self::assertSame([], $criteria->comparisons());
@@ -48,7 +48,7 @@ final class CriteriaTest extends TestCase
         $schema = Schema::create()->defaultSort(sort: Sort::fromExpression(expression: 'id'));
 
         /** @And a criteria parsed from a request carrying a page size of two and no cursor */
-        $criteria = Criteria::fromQuery(request: Query::from(parameters: ['page' => ['size' => '2']]), schema: $schema);
+        $criteria = Criteria::fromQuery(schema: $schema, request: Query::from(parameters: ['page' => ['size' => '2']]));
 
         /** @When building a cursor page through the keyset view over the array rows fetched */
         $page = $criteria->keyset()->page(items: [['id' => 10], ['id' => 20], ['id' => 30]]);
@@ -70,8 +70,8 @@ final class CriteriaTest extends TestCase
 
         /** @And a criteria parsed from a request carrying that cursor and a page size of two */
         $criteria = Criteria::fromQuery(
-            request: Query::from(parameters: ['page' => ['cursor' => $token, 'size' => '2']]),
-            schema: $schema
+            schema: $schema,
+            request: Query::from(parameters: ['page' => ['cursor' => $token, 'size' => '2']])
         );
 
         /** @When building a cursor page through the keyset view over the items fetched */
@@ -87,7 +87,7 @@ final class CriteriaTest extends TestCase
     public function testKeysetWhenEffectiveSortIsEmptyThenThrowsSortIsRequired(): void
     {
         /** @Given a criteria parsed from a request carrying no sort and no schema default */
-        $criteria = Criteria::fromQuery(request: Query::from(parameters: []));
+        $criteria = Criteria::fromQueryWithDefaultSchema(request: Query::from(parameters: []));
 
         /** @Then an exception indicating a deterministic order is required is raised */
         $this->expectException(SortIsRequired::class);
@@ -105,7 +105,7 @@ final class CriteriaTest extends TestCase
             ->defaultSort(sort: Sort::fromExpression(expression: 'id'));
 
         /** @When building the keyset view from a query carrying no page size and the schema */
-        $keyset = Criteria::fromQuery(request: Query::from(parameters: []), schema: $schema)->keyset();
+        $keyset = Criteria::fromQuery(schema: $schema, request: Query::from(parameters: []))->keyset();
 
         /** @Then the keyset carries the schema default page size */
         self::assertSame(5, $keyset->limit()->toInteger());
@@ -121,8 +121,8 @@ final class CriteriaTest extends TestCase
 
         /** @And a criteria parsed from a request carrying that cursor and a page size of ten */
         $criteria = Criteria::fromQuery(
-            request: Query::from(parameters: ['page' => ['cursor' => $token, 'size' => '10']]),
-            schema: $schema
+            schema: $schema,
+            request: Query::from(parameters: ['page' => ['cursor' => $token, 'size' => '10']])
         );
 
         /** @When building the keyset view */
@@ -145,7 +145,7 @@ final class CriteriaTest extends TestCase
         $this->expectExceptionMessage('Page size');
 
         /** @When building the criteria from the query */
-        Criteria::fromQuery(request: $query);
+        Criteria::fromQueryWithDefaultSchema(request: $query);
     }
 
     public function testFromQueryWhenFilterAndSortGivenThenEachSpecificationIsValidated(): void
@@ -159,7 +159,7 @@ final class CriteriaTest extends TestCase
         $query = Query::from(parameters: ['sort' => '-created_at', 'filter' => 'status==paid']);
 
         /** @When building the criteria from the query and the schema */
-        $criteria = Criteria::fromQuery(request: $query, schema: $schema);
+        $criteria = Criteria::fromQuery(schema: $schema, request: $query);
 
         /** @Then the validated comparisons carry the filtered field and value */
         self::assertEquals(

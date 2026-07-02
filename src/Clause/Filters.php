@@ -95,6 +95,22 @@ final readonly class Filters implements SqlClause
     }
 
     /**
+     * @param list<string> $parts
+     * @param array<string, mixed> $parameters
+     */
+    private static function joinParts(Group $group, array $parts, array $parameters): Fragment
+    {
+        if ($parts === []) {
+            return Fragment::of(sql: '', parameters: []);
+        }
+
+        $connective = $group->operator() === LogicalOperator::AND ? ' AND ' : ' OR ';
+        $sql = count($parts) === 1 ? $parts[0] : sprintf('(%s)', implode($connective, $parts));
+
+        return Fragment::of(sql: $sql, parameters: $parameters);
+    }
+
+    /**
      * Renders a group, joining its non-empty children with the group connective.
      *
      * @param Group $group The group to render.
@@ -111,7 +127,7 @@ final readonly class Filters implements SqlClause
         foreach ($group->filters() as $child) {
             $fragment = self::render(
                 filter: $child,
-                offset: $offset + count($parameters),
+                offset: ($offset + count($parameters)),
                 columns: $columns,
                 renderers: $renderers
             );
@@ -124,14 +140,7 @@ final readonly class Filters implements SqlClause
             $parameters = [...$parameters, ...$fragment->parameters()];
         }
 
-        if ($parts === []) {
-            return Fragment::of(sql: '', parameters: []);
-        }
-
-        $connective = $group->operator() === LogicalOperator::AND ? ' AND ' : ' OR ';
-        $sql = count($parts) === 1 ? $parts[0] : sprintf('(%s)', implode($connective, $parts));
-
-        return Fragment::of(sql: $sql, parameters: $parameters);
+        return self::joinParts(group: $group, parts: $parts, parameters: $parameters);
     }
 
     /**

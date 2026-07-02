@@ -74,11 +74,13 @@ $schema = Schema::create()
 
 # GET /v1/orders?filter=status==paid;total=ge=100&sort=-created_at,id&page[number]=3&page[size]=20
 /** @var ServerRequestInterface $request */
-$criteria = Criteria::fromQuery(request: $request, schema: $schema);
+$criteria = Criteria::fromQuery(schema: $schema, request: $request);
 ```
 
-When `Criteria::fromQuery` receives no schema, an empty contract applies: the default page-size bounds, no filterable
-or sortable field, and no default sort. Any incoming filter or sort is then rejected.
+For an endpoint that declares no contract, `Criteria::fromQueryWithDefaultSchema` is the request-only entry point. It
+applies the default schema, an empty contract: the default page-size bounds, no filterable or sortable field, and no
+default sort. Any incoming filter or sort is then rejected. Both `Offset\Criteria` and `Cursor\Criteria` expose it, so
+either pagination parses a request without building a schema.
 
 | Setting          | Default | Meaning                                         |
 |------------------|---------|-------------------------------------------------|
@@ -178,7 +180,7 @@ use TinyBlocks\HttpQuery\Schema;
 
 # GET /v1/orders?page[number]=3&page[size]=20
 /** @var ServerRequestInterface $request */
-$criteria = Criteria::fromQuery(request: $request, schema: Schema::create());
+$criteria = Criteria::fromQuery(schema: Schema::create(), request: $request);
 
 /** @var iterable<mixed> $items */
 $page = $criteria->page(total: 480, items: $items);
@@ -202,7 +204,7 @@ use TinyBlocks\HttpQuery\Schema;
 
 # GET /v1/orders?page[number]=2&page[size]=20
 /** @var ServerRequestInterface $request */
-$criteria = Criteria::fromQuery(request: $request, schema: Schema::create());
+$criteria = Criteria::fromQuery(schema: Schema::create(), request: $request);
 
 /** @var iterable<mixed> $items */
 $slice = $criteria->slice(items: $items);
@@ -231,7 +233,7 @@ $schema = Schema::create()->sortable(fields: ['created_at', 'id']);
 
 # GET /v1/orders?sort=-created_at,id&page[cursor]=BS3RvKY4LqEjYD19mQ0mCpJ&page[size]=20
 /** @var ServerRequestInterface $request */
-$keyset = Criteria::fromQuery(request: $request, schema: $schema)->keyset();
+$keyset = Criteria::fromQuery(schema: $schema, request: $request)->keyset();
 
 $keyset->limit()->toInteger();  # The page size, 20.
 $keyset->orders();              # The list<Order> the seek is ordered by.
@@ -387,7 +389,7 @@ $schema = Schema::create()->sortable(fields: ['created_at', 'id']);
 
 # GET /v1/orders?filter=status==paid&sort=-created_at,id&page[number]=3&page[size]=20
 /** @var ServerRequestInterface $request */
-$criteria = Criteria::fromQuery(request: $request, schema: $schema);
+$criteria = Criteria::fromQuery(schema: $schema, request: $request);
 
 /** @var iterable<mixed> $items */
 $response = $criteria->page(total: 480, items: $items)->toResponse(baseUri: '/v1/orders');

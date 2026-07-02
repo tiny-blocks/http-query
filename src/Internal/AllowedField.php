@@ -31,13 +31,7 @@ final readonly class AllowedField
         }
 
         foreach ($comparison->values() as $value) {
-            if (!is_null($this->values) && !in_array($value, $this->values, true)) {
-                throw FilterValueNotAllowed::notPermitted(field: $this->field, value: $value);
-            }
-
-            if (!is_null($this->kind) && !$this->kind->matches(value: $value)) {
-                throw FilterValueNotAllowed::kindMismatch(kind: $this->kind, field: $this->field, value: $value);
-            }
+            $this->permitValue(value: $value);
         }
 
         return $comparison;
@@ -46,5 +40,16 @@ final readonly class AllowedField
     public function hasField(string $field): bool
     {
         return $this->field === $field;
+    }
+
+    private function permitValue(string $value): void
+    {
+        if (!is_null($this->values) && !in_array($value, $this->values, true)) {
+            throw FilterValueNotAllowed::notPermitted(field: $this->field, value: $value);
+        }
+
+        if (!is_null($this->kind) && !$this->kind->matches(value: $value)) {
+            throw FilterValueNotAllowed::kindMismatch(kind: $this->kind, field: $this->field, value: $value);
+        }
     }
 }

@@ -24,7 +24,7 @@ final readonly class Offset
 
     public static function fromPage(PageNumber $page, Limit $limit): Offset
     {
-        return new Offset(value: ($page->value() - 1) * $limit->value());
+        return new Offset(value: (($page->value() - 1) * $limit->value()));
     }
 
     public function value(): int

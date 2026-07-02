@@ -17,7 +17,9 @@ final class SliceTest extends TestCase
     public function testToResponseWhenSliceGivenThenRendersBodyAndLinkHeader(): void
     {
         /** @Given a criteria on the second page with a page size of three */
-        $criteria = Criteria::fromQuery(request: Query::from(parameters: ['page' => ['number' => '2', 'size' => '3']]));
+        $criteria = Criteria::fromQueryWithDefaultSchema(
+            request: Query::from(parameters: ['page' => ['number' => '2', 'size' => '3']])
+        );
 
         /** @And a slice built from items fetched for the page size plus one */
         $slice = $criteria->slice(items: ['a', 'b', 'c', 'd']);
@@ -54,7 +56,9 @@ final class SliceTest extends TestCase
     public function testOffsetWhenSecondPageGivenThenReturnsTheZeroBasedOffset(): void
     {
         /** @Given a criteria on the second page with a page size of three */
-        $criteria = Criteria::fromQuery(request: Query::from(parameters: ['page' => ['number' => '2', 'size' => '3']]));
+        $criteria = Criteria::fromQueryWithDefaultSchema(
+            request: Query::from(parameters: ['page' => ['number' => '2', 'size' => '3']])
+        );
 
         /** @When building the slice from the items fetched for the page size plus one */
         $slice = $criteria->slice(items: ['a', 'b', 'c', 'd']);
@@ -66,7 +70,9 @@ final class SliceTest extends TestCase
     public function testNavigationWhenExtraElementFetchedThenHasNextAndTrimsItems(): void
     {
         /** @Given a criteria on the second page with a page size of three */
-        $criteria = Criteria::fromQuery(request: Query::from(parameters: ['page' => ['number' => '2', 'size' => '3']]));
+        $criteria = Criteria::fromQueryWithDefaultSchema(
+            request: Query::from(parameters: ['page' => ['number' => '2', 'size' => '3']])
+        );
 
         /** @When building the slice from the items fetched for the page size plus one */
         $slice = $criteria->slice(items: ['a', 'b', 'c', 'd']);
@@ -104,7 +110,9 @@ final class SliceTest extends TestCase
     public function testNavigationWhenNoExtraElementOnFirstPageThenNoNextAndNoPrevious(): void
     {
         /** @Given a criteria on the first page with a page size of three */
-        $criteria = Criteria::fromQuery(request: Query::from(parameters: ['page' => ['number' => '1', 'size' => '3']]));
+        $criteria = Criteria::fromQueryWithDefaultSchema(
+            request: Query::from(parameters: ['page' => ['number' => '1', 'size' => '3']])
+        );
 
         /** @When building the slice from items fetched within the page size */
         $slice = $criteria->slice(items: ['a', 'b', 'c']);
@@ -131,7 +139,9 @@ final class SliceTest extends TestCase
     public function testNavigationWhenMiddlePageGivenThenListsFirstPreviousAndNextRelations(): void
     {
         /** @Given a criteria on a middle page fetched for the page size plus one */
-        $criteria = Criteria::fromQuery(request: Query::from(parameters: ['page' => ['number' => '2', 'size' => '3']]));
+        $criteria = Criteria::fromQueryWithDefaultSchema(
+            request: Query::from(parameters: ['page' => ['number' => '2', 'size' => '3']])
+        );
 
         /** @And a slice on that middle page */
         $slice = $criteria->slice(items: ['a', 'b', 'c', 'd']);
@@ -148,7 +158,9 @@ final class SliceTest extends TestCase
     public function testNavigationWhenMiddlePageGivenThenTheFirstTargetPointsAtTheFirstPage(): void
     {
         /** @Given a criteria on a middle page fetched for the page size plus one */
-        $criteria = Criteria::fromQuery(request: Query::from(parameters: ['page' => ['number' => '2', 'size' => '3']]));
+        $criteria = Criteria::fromQueryWithDefaultSchema(
+            request: Query::from(parameters: ['page' => ['number' => '2', 'size' => '3']])
+        );
 
         /** @And a slice on that middle page */
         $slice = $criteria->slice(items: ['a', 'b', 'c', 'd']);
@@ -166,7 +178,9 @@ final class SliceTest extends TestCase
     public function testNavigationWhenMiddlePageGivenThenTheNextTargetPointsAtTheFollowingPage(): void
     {
         /** @Given a criteria on a middle page fetched for the page size plus one */
-        $criteria = Criteria::fromQuery(request: Query::from(parameters: ['page' => ['number' => '2', 'size' => '3']]));
+        $criteria = Criteria::fromQueryWithDefaultSchema(
+            request: Query::from(parameters: ['page' => ['number' => '2', 'size' => '3']])
+        );
 
         /** @And a slice on that middle page */
         $slice = $criteria->slice(items: ['a', 'b', 'c', 'd']);
@@ -184,7 +198,9 @@ final class SliceTest extends TestCase
     public function testNavigationWhenFirstPageWithoutExtraElementThenListsOnlyTheFirstRelation(): void
     {
         /** @Given a criteria on the first page fetched within the page size */
-        $criteria = Criteria::fromQuery(request: Query::from(parameters: ['page' => ['number' => '1', 'size' => '3']]));
+        $criteria = Criteria::fromQueryWithDefaultSchema(
+            request: Query::from(parameters: ['page' => ['number' => '1', 'size' => '3']])
+        );
 
         /** @And a slice on that first page */
         $slice = $criteria->slice(items: ['a', 'b', 'c']);

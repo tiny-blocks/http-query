@@ -30,8 +30,8 @@ final class KeysetTest extends TestCase
     {
         /** @Given a keyset view built from a request carrying a sort and a page size of fifteen */
         $keyset = Criteria::fromQuery(
-            request: Query::from(parameters: ['sort' => 'id', 'page' => ['size' => '15']]),
-            schema: $this->schema
+            schema: $this->schema,
+            request: Query::from(parameters: ['sort' => 'id', 'page' => ['size' => '15']])
         )->keyset();
 
         /** @When reading the page size */
@@ -44,7 +44,7 @@ final class KeysetTest extends TestCase
     public function testOrdersWhenSortGivenThenReturnsItsOrders(): void
     {
         /** @Given a keyset view built from a descending sort over a single field */
-        $keyset = Criteria::fromQuery(request: Query::from(parameters: ['sort' => '-name']), schema: $this->schema)
+        $keyset = Criteria::fromQuery(schema: $this->schema, request: Query::from(parameters: ['sort' => '-name']))
             ->keyset();
 
         /** @When reading the orders */
@@ -58,8 +58,8 @@ final class KeysetTest extends TestCase
     {
         /** @Given a keyset view built from a request carrying a sort and a page size of two */
         $keyset = Criteria::fromQuery(
-            request: Query::from(parameters: ['sort' => 'id', 'page' => ['size' => '2']]),
-            schema: $this->schema
+            schema: $this->schema,
+            request: Query::from(parameters: ['sort' => 'id', 'page' => ['size' => '2']])
         )->keyset();
 
         /** @When building the page from the items and an explicit key extractor */
@@ -76,8 +76,8 @@ final class KeysetTest extends TestCase
     {
         /** @Given a keyset view built from a request carrying a sort over two fields */
         $keyset = Criteria::fromQuery(
-            request: Query::from(parameters: ['sort' => 'created_at,id', 'page' => ['size' => '2']]),
-            schema: $this->schema
+            schema: $this->schema,
+            request: Query::from(parameters: ['sort' => 'created_at,id', 'page' => ['size' => '2']])
         )->keyset();
 
         /** @When reading the incoming cursor key values */
@@ -91,8 +91,8 @@ final class KeysetTest extends TestCase
     {
         /** @Given a keyset view built from a request carrying a sort and a page size of two */
         $keyset = Criteria::fromQuery(
-            request: Query::from(parameters: ['sort' => 'id', 'page' => ['size' => '2']]),
-            schema: $this->schema
+            schema: $this->schema,
+            request: Query::from(parameters: ['sort' => 'id', 'page' => ['size' => '2']])
         )->keyset();
 
         /** @When building the page from array rows without a key extractor */
@@ -112,10 +112,10 @@ final class KeysetTest extends TestCase
 
         /** @And a keyset view built from a request carrying that cursor and a sort over two fields */
         $keyset = Criteria::fromQuery(
+            schema: $this->schema,
             request: Query::from(
                 parameters: ['sort' => 'created_at,id', 'page' => ['cursor' => $token, 'size' => '2']]
-            ),
-            schema: $this->schema
+            )
         )->keyset();
 
         /** @When reading the incoming cursor key values */
@@ -132,10 +132,10 @@ final class KeysetTest extends TestCase
 
         /** @And a keyset view whose sort carries two fields */
         $keyset = Criteria::fromQuery(
+            schema: $this->schema,
             request: Query::from(
                 parameters: ['sort' => 'created_at,id', 'page' => ['cursor' => $token, 'size' => '2']]
-            ),
-            schema: $this->schema
+            )
         )->keyset();
 
         /** @Then an exception indicating the cursor is invalid is raised */

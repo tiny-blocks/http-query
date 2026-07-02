@@ -26,7 +26,7 @@ final readonly class FilterClause
     {
         $values = array_map($column->normalize(...), $comparison->values());
         $names = array_map(
-            static fn(int $index): string => sprintf('filter_%d', $offset + $index),
+            static fn(int $index): string => sprintf('filter_%d', ($offset + $index)),
             array_keys($values)
         );
         $parameters = array_combine($names, $values);
