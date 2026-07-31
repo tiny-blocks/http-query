@@ -60,6 +60,36 @@ final class FilterTest extends TestCase
         ], $comparisons);
     }
 
+    public function testFromQueryWhenPrefixOperatorThenComparisonCarriesTheLiteralPrefix(): void
+    {
+        /** @Given a query carrying a prefix comparison */
+        $query = Query::from(parameters: ['filter' => 'name=sw=jose']);
+
+        /** @When reading the validated comparisons */
+        $comparisons = Criteria::fromQuery(schema: $this->schema, request: $query)->comparisons();
+
+        /** @Then the only comparison is a prefix comparison carrying the raw value */
+        self::assertEquals(
+            [Comparison::of(field: 'name', values: ['jose'], operator: Operator::STARTS_WITH)],
+            $comparisons
+        );
+    }
+
+    public function testFromQueryWhenPrefixOperatorFollowsEqualThenBothTokensResolve(): void
+    {
+        /** @Given a query whose expression mixes the equality and the prefix tokens */
+        $query = Query::from(parameters: ['filter' => 'status==ACTIVE;name=sw=jo']);
+
+        /** @When reading the validated comparisons */
+        $comparisons = Criteria::fromQuery(schema: $this->schema, request: $query)->comparisons();
+
+        /** @Then neither token shadows the other during scanning */
+        self::assertEquals([
+            Comparison::of(field: 'status', values: ['ACTIVE'], operator: Operator::EQUAL),
+            Comparison::of(field: 'name', values: ['jo'], operator: Operator::STARTS_WITH)
+        ], $comparisons);
+    }
+
     public function testFromQueryWhenInListThenComparisonCarriesEveryValue(): void
     {
         /** @Given a query carrying an IN list comparison */
