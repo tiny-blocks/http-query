@@ -14,6 +14,17 @@ use TinyBlocks\HttpQuery\Operator;
  */
 final readonly class FilterClause
 {
+    private const array TEMPLATES = [
+        Operator::IN->value                    => '%s IN (%s)',
+        Operator::EQUAL->value                 => '%s = %s',
+        Operator::NOT_IN->value                => '%s NOT IN (%s)',
+        Operator::LESS_THAN->value             => '%s < %s',
+        Operator::NOT_EQUAL->value             => '%s <> %s',
+        Operator::GREATER_THAN->value          => '%s > %s',
+        Operator::LESS_THAN_OR_EQUAL->value    => '%s <= %s',
+        Operator::GREATER_THAN_OR_EQUAL->value => '%s >= %s'
+    ];
+
     /**
      * Renders the built-in fragment from the column, the placeholder offset, and the comparison.
      *
@@ -24,6 +35,8 @@ final readonly class FilterClause
      */
     public static function from(FilterColumn $column, int $offset, Comparison $comparison): Fragment
     {
+        $operator = $comparison->operator();
+
         $values = array_map($column->normalize(...), $comparison->values());
         $names = array_map(
             static fn(int $index): string => sprintf('filter_%d', ($offset + $index)),
@@ -35,24 +48,8 @@ final readonly class FilterClause
             $names
         );
 
-        $sql = match ($comparison->operator()) {
-            Operator::IN                    =>
-            sprintf('%s IN (%s)', $column->column(), implode(', ', $placeholders)),
-            Operator::NOT_IN                =>
-            sprintf('%s NOT IN (%s)', $column->column(), implode(', ', $placeholders)),
-            Operator::EQUAL                 =>
-            sprintf('%s = %s', $column->column(), $placeholders[0]),
-            Operator::NOT_EQUAL             =>
-            sprintf('%s <> %s', $column->column(), $placeholders[0]),
-            Operator::LESS_THAN             =>
-            sprintf('%s < %s', $column->column(), $placeholders[0]),
-            Operator::GREATER_THAN          =>
-            sprintf('%s > %s', $column->column(), $placeholders[0]),
-            Operator::LESS_THAN_OR_EQUAL    =>
-            sprintf('%s <= %s', $column->column(), $placeholders[0]),
-            Operator::GREATER_THAN_OR_EQUAL =>
-            sprintf('%s >= %s', $column->column(), $placeholders[0])
-        };
+        $argument = $operator->isMultiValued() ? implode(', ', $placeholders) : $placeholders[0];
+        $sql = sprintf(self::TEMPLATES[$operator->value], $column->column(), $argument);
 
         return Fragment::of(sql: $sql, parameters: $parameters);
     }
