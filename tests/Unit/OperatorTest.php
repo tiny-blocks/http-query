@@ -56,6 +56,7 @@ final class OperatorTest extends TestCase
             'NOT_IN'                => ['operator' => Operator::NOT_IN, 'token' => '=out='],
             'LESS_THAN'             => ['operator' => Operator::LESS_THAN, 'token' => '=lt='],
             'NOT_EQUAL'             => ['operator' => Operator::NOT_EQUAL, 'token' => '!='],
+            'STARTS_WITH'           => ['operator' => Operator::STARTS_WITH, 'token' => '=sw='],
             'GREATER_THAN'          => ['operator' => Operator::GREATER_THAN, 'token' => '=gt='],
             'LESS_THAN_OR_EQUAL'    => ['operator' => Operator::LESS_THAN_OR_EQUAL, 'token' => '=le='],
             'GREATER_THAN_OR_EQUAL' => ['operator' => Operator::GREATER_THAN_OR_EQUAL, 'token' => '=ge=']
@@ -70,6 +71,7 @@ final class OperatorTest extends TestCase
             'NOT_IN'                => ['operator' => Operator::NOT_IN, 'multiValued' => true],
             'LESS_THAN'             => ['operator' => Operator::LESS_THAN, 'multiValued' => false],
             'NOT_EQUAL'             => ['operator' => Operator::NOT_EQUAL, 'multiValued' => false],
+            'STARTS_WITH'           => ['operator' => Operator::STARTS_WITH, 'multiValued' => false],
             'GREATER_THAN'          => ['operator' => Operator::GREATER_THAN, 'multiValued' => false],
             'LESS_THAN_OR_EQUAL'    => ['operator' => Operator::LESS_THAN_OR_EQUAL, 'multiValued' => false],
             'GREATER_THAN_OR_EQUAL' => ['operator' => Operator::GREATER_THAN_OR_EQUAL, 'multiValued' => false]

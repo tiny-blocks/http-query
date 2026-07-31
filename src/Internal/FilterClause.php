@@ -20,6 +20,7 @@ final readonly class FilterClause
         Operator::NOT_IN->value                => '%s NOT IN (%s)',
         Operator::LESS_THAN->value             => '%s < %s',
         Operator::NOT_EQUAL->value             => '%s <> %s',
+        Operator::STARTS_WITH->value           => '%s LIKE %s ESCAPE \'!\'',
         Operator::GREATER_THAN->value          => '%s > %s',
         Operator::LESS_THAN_OR_EQUAL->value    => '%s <= %s',
         Operator::GREATER_THAN_OR_EQUAL->value => '%s >= %s'
@@ -37,7 +38,11 @@ final readonly class FilterClause
     {
         $operator = $comparison->operator();
 
-        $values = array_map($column->normalize(...), $comparison->values());
+        $compared = $comparison->hasOperator(operator: Operator::STARTS_WITH)
+            ? array_map(AnchoredPrefix::from(...), $comparison->values())
+            : $comparison->values();
+
+        $values = array_map($column->normalize(...), $compared);
         $names = array_map(
             static fn(int $index): string => sprintf('filter_%d', ($offset + $index)),
             array_keys($values)

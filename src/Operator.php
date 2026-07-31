@@ -16,6 +16,7 @@ enum Operator: string
     case NOT_IN = '=out=';
     case LESS_THAN = '=lt=';
     case NOT_EQUAL = '!=';
+    case STARTS_WITH = '=sw=';
     case GREATER_THAN = '=gt=';
     case LESS_THAN_OR_EQUAL = '=le=';
     case GREATER_THAN_OR_EQUAL = '=ge=';

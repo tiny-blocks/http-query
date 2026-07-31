@@ -18,14 +18,14 @@
 
 ## Overview
 
-A typed, framework-independent toolkit for querying an HTTP collection endpoint. The endpoint declares
-the query contract once on a `Schema`, the library parses an incoming request query string against it, and the consumer
-reads an already-validated result: a conjunction of comparisons for filtering, an effective sort, and a pagination view.
-The result renders as a JSON:API response carrying an RFC 8288 `Link` header and a body `links` object.
+A typed, framework-independent toolkit for querying an HTTP collection endpoint. The endpoint declares the query
+contract once on a `Schema`, the library parses an incoming request query string against it, and the consumer reads an
+already-validated result: a conjunction of comparisons for filtering, an effective sort, and a pagination view. The
+result renders as a JSON:API response carrying an RFC 8288 `Link` header and a body `links` object.
 
 The library never touches a data store. It turns the query string into value objects the consumer applies to its own
-store, and it renders the response the consumer returns. Every computation is O(1) value-object math over the inputs the
-consumer supplies.
+store, and it renders the response the consumer returns. Every computation is O (1) value-object math over the inputs
+the consumer supplies.
 
 The pagination approach is a fixed decision of the endpoint, not a runtime property of a request. The public API splits
 into two contexts, `Cursor` and `Offset`, each complete and approach-only, with the building blocks common to both at
@@ -50,8 +50,8 @@ parameters, validate them against the schema, and expose the same `comparisons()
 `Schema` is the contract of the query an endpoint accepts. `filterable` declares a field with its permitted operators
 and, optionally, the permitted values and the `ValueKind` every value must match. `sortable` declares the fields the
 client may sort by. `defaultSort` declares the sort applied when the client sends none. `maxPerPage` and
-`defaultPerPage`
-bound the page size. The query parameter names follow JSON:API and are fixed: `filter`, `sort`, and the `page` family.
+`defaultPerPage` bound the page size. The query parameter names follow JSON:API and are fixed: `filter`, `sort`, and the
+`page` family.
 
 ```php
 <?php
@@ -115,13 +115,12 @@ foreach ($criteria->comparisons() as $comparison) {
 ```
 
 The supported operators map to their RSQL tokens through the `Operator` enum (`==`, `!=`, `=lt=`, `=gt=`, `=le=`,
-`=ge=`, `=in=`, `=out=`). The logical connectives map through the `LogicalOperator` enum, where `;` (AND) binds tighter
-than `,` (OR), and parentheses group. By default, the filter must be a single comparison or an AND group of comparisons,
-and any other shape raises `FilterShapeNotSupported`. A schema that calls `allowDisjunction` accepts OR groups and
-nested
-groups, validates every leaf the same way, and the consumer then reads the full tree from `Criteria::filter()` to render
-it. A malformed expression raises `FilterExpressionIsInvalid`, and anything outside the contract raises a dedicated
-exception, each implementing `HttpQueryException`.
+`=ge=`, `=in=`, `=out=`, `=sw=`). The logical connectives map through the `LogicalOperator` enum, where `;` (AND)
+binds tighter than `,` (OR), and parentheses group. By default, the filter must be a single comparison or an AND group
+of comparisons, and any other shape raises `FilterShapeNotSupported`. A schema that calls `allowDisjunction`
+accepts OR groups and nested groups, validates every leaf the same way, and the consumer then reads the full tree from
+`Criteria::filter()` to render it. A malformed expression raises `FilterExpressionIsInvalid`, and anything outside the
+contract raises a dedicated exception, each implementing `HttpQueryException`.
 
 | Exception                   | Raised when                                                                       |
 |-----------------------------|-----------------------------------------------------------------------------------|
@@ -130,6 +129,29 @@ exception, each implementing `HttpQueryException`.
 | `FilterFieldNotAllowed`     | A comparison targets a field that was never declared filterable.                  |
 | `FilterOperatorNotAllowed`  | A comparison uses an operator not allowed for its field.                          |
 | `FilterValueNotAllowed`     | A compared value falls outside the permitted set or the expected kind.            |
+
+### Prefix matching with `=sw=`
+
+`=sw=` compares the value as a **literal prefix** of the column. It renders as an anchored `LIKE` so a B-tree index on
+the column is still usable:
+
+```sql
+cli.name LIKE :filter_0 ESCAPE '!'
+```
+
+Only the trailing `%` is added by the library. Every `%`, `_`, and `!` inside the value is escaped before binding, so a
+search for `100%` matches a name starting with the literal `100%` instead of expanding into a wildcard. There is no
+unanchored counterpart (contains, ends with) by design: an unanchored comparison cannot use the index and degrades the
+listing into a table scan as the data grows.
+
+The escape character is `!` rather than the customary backslash on purpose. A backslash has to be written `'\\'` in a
+SQL literal under the default MySQL mode and `'\'` under `NO_BACKSLASH_ESCAPES`, so no single spelling is valid in both.
+Under `NO_BACKSLASH_ESCAPES` the backslash form fails with `Incorrect arguments to ESCAPE`. A `!` needs no quoting in
+either mode, so the rendered predicate is independent of the server configuration.
+
+**Case and accent sensitivity come from the column collation, not from this library.** The rendered SQL carries no
+`COLLATE`, so a column declared `utf8mb4_0900_ai_ci` (accent-insensitive, case-insensitive) makes `jose` match `José`,
+while a binary collation matches exactly. Declare the collation the endpoint promises.
 
 `ValueKind` is the kind a value is validated against. For the multivalued operators (`=in=`, `=out=`) every value is
 checked.
@@ -271,14 +293,14 @@ An invalid cursor token raises `CursorIsInvalid` when it is decoded.
 
 ### Building the store query
 
-The library decides what to fetch and hands the consumer typed SQL fragments to apply against its own
-store. It builds no statement: the `SELECT`, the `FROM`, the joins, the `LIMIT`, and the dialect stay
-with the consumer (or its query builder). Every fragment is a `Clause\SqlClause` exposing `sql()`,
-`parameters()`, and `isEmpty()`, so the consumer programs the `WHERE` assembly against one abstraction.
+The library decides what to fetch and hands the consumer typed SQL fragments to apply against its own store. It builds
+no statement: the `SELECT`, the `FROM`, the joins, the `LIMIT`, and the dialect stay with the consumer (or its query
+builder). Every fragment is a `Clause\SqlClause` exposing `sql()`, `parameters()`, and `isEmpty()`, so the consumer
+programs the `WHERE` assembly against one abstraction.
 
-`Clause\FilterColumns` maps each queryable field to its column. It is an immutable fluent builder, with
-`plain`, `boolean`, and `wrapped` shortcuts, and `with` for a custom `FilterColumn`. The same mapping
-feeds the filter, the seek, and the sort.
+`Clause\FilterColumns` maps each queryable field to its column. It is an immutable fluent builder, with `plain`,
+`boolean`, and `wrapped` shortcuts, and `with` for a custom `FilterColumn`. The same mapping feeds the filter, the seek,
+and the sort.
 
 ```php
 <?php
@@ -314,23 +336,22 @@ $sql = sprintf('%s%s ORDER BY %s LIMIT %d', $base, $where, $sort->sql(), $limit-
 # Bind $predicate->parameters() and run $sql against your store.
 ```
 
-`Clause\Every::of` combines several `SqlClause` predicates, dropping the empty ones, joining the rest
-with `AND`, and merging their parameters. It is itself a `SqlClause`, so a consumer-owned predicate
-(for example a tenant scope) drops into the same combination by implementing `SqlClause`.
+`Clause\Every::of` combines several `SqlClause` predicates, dropping the empty ones, joining the rest with `AND`, and
+merging their parameters. It is itself a `SqlClause`, so a consumer-owned predicate (for example a tenant scope) drops
+into the same combination by implementing `SqlClause`.
 
-`Filters::from` renders a flat list of comparisons joined with `AND`, which fits the default
-conjunction-only contract. When the schema calls `allowDisjunction`, the filter may be an OR group or a
-nested group, so the consumer renders the full tree with `Filters::fromTree(filter: $criteria->filter(),
-columns: $columns)` instead. It walks the tree, joins each group by its own connective, wraps every group
-in parentheses, and threads the placeholder offsets across the whole tree.
+`Filters::from` renders a flat list of comparisons joined with `AND`, which fits the default conjunction-only contract.
+When the schema calls `allowDisjunction`, the filter may be an OR group or a nested group, so the consumer renders the
+full tree with `Filters::fromTree(filter: $criteria->filter(), columns: $columns)` instead. It walks the tree, joins
+each group by its own connective, wraps every group in parentheses, and threads the placeholder offsets across the whole
+tree.
 
-`Limit` is the page size value object. `plus` raises it by an amount and `plusOne` raises it by one,
-the extra row a keyset page fetches to detect a next page. `toInteger` reads the value back.
+`Limit` is the page size value object. `plus` raises it by an amount and `plusOne` raises it by one, the extra row a
+keyset page fetches to detect a next page. `toInteger` reads the value back.
 
-`Filters::from` renders each comparison with the built-in operator mapping (`==`, `!=`, `=in=`,
-`=out=`, `=lt=`, `=gt=`, `=le=`, `=ge=`). To render a shape the built-in mapping does not cover, pass a
-`Clause\OperatorRenderer`. The first renderer that `supports` a comparison's operator renders it,
-otherwise the built-in mapping does.
+`Filters::from` renders each comparison with the built-in operator mapping (`==`, `!=`, `=in=`, `=out=`, `=lt=`, `=gt=`,
+`=le=`, `=ge=`, `=sw=`). To render a shape the built-in mapping does not cover, pass a `Clause\OperatorRenderer`. The
+first renderer that `supports` a comparison's operator renders it, otherwise the built-in mapping does.
 
 ```php
 <?php
@@ -365,9 +386,8 @@ final readonly class CaseInsensitiveContains implements OperatorRenderer
 # Filters::from($columns, $comparisons, new CaseInsensitiveContains());
 ```
 
-A custom renderer reuses an existing RSQL operator token (the grammar the `Scanner` accepts is fixed),
-so a comparison the parser already produces is rendered differently. It does not add a new token to the
-filter grammar.
+A custom renderer reuses an existing RSQL operator token (the grammar the `Scanner` accepts is fixed), so a comparison
+the parser already produces is rendered differently. It does not add a new token to the filter grammar.
 
 ### Rendering navigation links
 
@@ -398,8 +418,8 @@ $response = $criteria->page(total: 480, items: $items)->toResponse(baseUri: '/v1
 The body carries the data, the meta, and the links, with the filter and the sort preserved in every URI. The two
 approaches return different shapes, shown below.
 
-An **offset** page exposes the full window (`total`, `total_pages`, `current_page`, `has_previous`) and a link for
-every relation:
+An **offset** page exposes the full window (`total`, `total_pages`, `current_page`, `has_previous`) and a link for every
+relation:
 
 ```json
 {
@@ -479,8 +499,8 @@ Link: </v1/orders?filter=status==paid&sort=-created_at,id&page[cursor]=BS3RvKY4L
 ```
 
 The `links` keys are the canonical JSON:API relations, in the semantic order below. Unavailable relations are omitted,
-so the first offset page carries no `prev` and the last carries no `next`, and an `Offset\Slice` omits `last` (it has
-no total).
+so the first offset page carries no `prev` and the last carries no `next`, and an `Offset\Slice` omits `last` (it has no
+total).
 
 | Relation | Meaning            |
 |----------|--------------------|
@@ -510,8 +530,8 @@ fails at the boundary with a dedicated `HttpQueryException`, never reaching the 
 
 RSQL is a small, URI-safe grammar with a published reference, so the filter survives a query string without encoding and
 the same expression reads the same on the client and the server. The library is conjunction-only for the consumer: a
-single comparison or an AND group of comparisons flattens into the `list<Comparison>` the consumer applies. An OR
-group, or a group nested inside another group, is rejected as an unsupported shape.
+single comparison or an AND group of comparisons flattens into the `list<Comparison>` the consumer applies. An OR group,
+or a group nested inside another group, is rejected as an unsupported shape.
 
 > Zdenek Jirutka, *RSQL / FIQL parser*.
 
