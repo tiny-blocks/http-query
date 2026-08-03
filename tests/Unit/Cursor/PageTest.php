@@ -40,8 +40,8 @@ final class PageTest extends TestCase
         /** @When the items are projected through a transformation */
         $mapped = $page->map(transformation: static fn(int $element): int => ($element * 2));
 
-        /** @Then the copy keeps the supplied metadata ahead of the pagination contents */
-        self::assertSame(['unread_count' => 7, 'per_page' => 2, 'has_next' => false], $mapped->metadata());
+        /** @Then the copy keeps the supplied metadata after the pagination contents */
+        self::assertSame(['per_page' => 2, 'has_next' => false, 'unread_count' => 7], $mapped->metadata());
     }
 
     public function testNavigationWhenNoExtraElementThenHasNoNextPage(): void
@@ -85,12 +85,12 @@ final class PageTest extends TestCase
         /** @When metadata is supplied twice */
         $counted = $page->withMetadata(metadata: ['unread_count' => 7])->withMetadata(metadata: ['muted_count' => 3]);
 
-        /** @Then both entries reach the meta contents, in the order they were supplied */
+        /** @Then both entries follow the pagination contents, in the order they were supplied */
         self::assertSame([
-            'unread_count' => 7,
-            'muted_count'  => 3,
             'per_page'     => 2,
-            'has_next'     => false
+            'has_next'     => false,
+            'unread_count' => 7,
+            'muted_count'  => 3
         ], $counted->metadata());
     }
 
@@ -218,13 +218,13 @@ final class PageTest extends TestCase
         /** @When rendering the cursor page as a JSON:API response over the notifications base URI */
         $response = $page->toResponse(baseUri: '/v1/notifications');
 
-        /** @Then the supplied counter renders inside meta, ahead of the pagination contents */
+        /** @Then the supplied counter renders inside meta, after the pagination contents */
         self::assertSame([
             'data'  => [10, 20],
             'meta'  => [
-                'unread_count' => 7,
                 'per_page'     => 2,
-                'has_next'     => true
+                'has_next'     => true,
+                'unread_count' => 7
             ],
             'links' => [
                 'self' => '/v1/notifications?page[size]=2',

@@ -156,16 +156,16 @@ final class PageTest extends TestCase
         /** @When metadata is supplied twice */
         $counted = $page->withMetadata(metadata: ['unread_count' => 7])->withMetadata(metadata: ['muted_count' => 3]);
 
-        /** @Then both entries reach the meta contents, in the order they were supplied */
+        /** @Then both entries follow the pagination contents, in the order they were supplied */
         self::assertSame([
-            'unread_count' => 7,
-            'muted_count'  => 3,
             'total'        => 2,
             'per_page'     => 20,
             'total_pages'  => 1,
             'current_page' => 1,
             'has_next'     => false,
-            'has_previous' => false
+            'has_previous' => false,
+            'unread_count' => 7,
+            'muted_count'  => 3
         ], $counted->metadata());
     }
 
@@ -335,17 +335,17 @@ final class PageTest extends TestCase
         /** @When rendering the page as a JSON:API response over the notifications base URI */
         $response = $page->toResponse(baseUri: '/v1/notifications');
 
-        /** @Then the supplied counter renders inside meta, ahead of the pagination contents */
+        /** @Then the supplied counter renders inside meta, after the pagination contents */
         self::assertSame([
             'data'  => ['a', 'b'],
             'meta'  => [
-                'unread_count' => 7,
                 'total'        => 2,
                 'per_page'     => 20,
                 'total_pages'  => 1,
                 'current_page' => 1,
                 'has_next'     => false,
-                'has_previous' => false
+                'has_previous' => false,
+                'unread_count' => 7
             ],
             'links' => [
                 'self'  => '/v1/notifications?page[number]=1&page[size]=20',

@@ -131,19 +131,20 @@ final readonly class Page
     /**
      * Returns the cursor page as the JSON:API meta contents.
      *
-     * <p>Any metadata supplied through withMetadata comes first, in the order it was given. The
-     * pagination contents come last, so a supplied key never shadows them.</p>
+     * <p>The pagination contents come first. Any metadata supplied through withMetadata follows,
+     * in the order it was given, and a supplied key that repeats a pagination one is discarded.</p>
      *
-     * @return array<string, mixed> The meta contents, the supplied metadata first, then the
-     * pagination counts and sizes, then the boolean flags, each by ascending key-name length.
+     * @return array<string, mixed> The meta contents, the pagination counts and sizes first, then
+     * the boolean flags, each by ascending key-name length, then the supplied metadata.
      */
     public function metadata(): array
     {
-        return [
-            ...$this->extraMetadata,
+        $pagination = [
             'per_page' => $this->pagination->limit(),
             'has_next' => $this->hasNext
         ];
+
+        return [...$pagination, ...array_diff_key($this->extraMetadata, $pagination)];
     }
 
     /**
