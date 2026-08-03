@@ -143,6 +143,32 @@ final class PageTest extends TestCase
         self::assertSame(480, $page->total());
     }
 
+    public function testWithMetadataWhenAppliedTwiceThenBothEntriesAreKept(): void
+    {
+        /** @Given a criteria on the first page with a page size of twenty */
+        $criteria = Criteria::fromQueryWithDefaultSchema(
+            request: Query::from(parameters: ['page' => ['number' => '1', 'size' => '20']])
+        );
+
+        /** @And a page with no supplied metadata */
+        $page = $criteria->page(items: ['a', 'b'], total: 2);
+
+        /** @When metadata is supplied twice */
+        $counted = $page->withMetadata(metadata: ['unread_count' => 7])->withMetadata(metadata: ['muted_count' => 3]);
+
+        /** @Then both entries reach the meta contents, in the order they were supplied */
+        self::assertSame([
+            'unread_count' => 7,
+            'muted_count'  => 3,
+            'total'        => 2,
+            'per_page'     => 20,
+            'total_pages'  => 1,
+            'current_page' => 1,
+            'has_next'     => false,
+            'has_previous' => false
+        ], $counted->metadata());
+    }
+
     public function testTotalPagesWhenTotalIsNotAMultipleOfPerPageThenRoundsUp(): void
     {
         /** @Given a criteria on the first page with a page size of twenty */
@@ -155,6 +181,30 @@ final class PageTest extends TestCase
 
         /** @Then the total number of pages rounds the division up */
         self::assertSame(2, $page->totalPages());
+    }
+
+    public function testWithMetadataWhenAKeyCollidesThenThePaginationEntryWins(): void
+    {
+        /** @Given a criteria on the first page with a page size of twenty */
+        $criteria = Criteria::fromQueryWithDefaultSchema(
+            request: Query::from(parameters: ['page' => ['number' => '1', 'size' => '20']])
+        );
+
+        /** @And a page built from a total of two */
+        $page = $criteria->page(items: ['a', 'b'], total: 2);
+
+        /** @When metadata reusing a pagination key is supplied */
+        $counted = $page->withMetadata(metadata: ['total' => 99]);
+
+        /** @Then the pagination entry stands and the supplied value never shadows it */
+        self::assertSame([
+            'total'        => 2,
+            'per_page'     => 20,
+            'total_pages'  => 1,
+            'current_page' => 1,
+            'has_next'     => false,
+            'has_previous' => false
+        ], $counted->metadata());
     }
 
     public function testMetadataWhenMiddlePageGivenThenCarriesEveryFlagAndCount(): void
@@ -270,6 +320,46 @@ final class PageTest extends TestCase
 
         /** @And the last pagination points at the last page */
         self::assertSame(24, $page->last()?->page());
+    }
+
+    public function testWithMetadataWhenRenderedThenMetaCarriesItAndTheLinkHeaderHolds(): void
+    {
+        /** @Given a criteria on the first page with a page size of twenty */
+        $criteria = Criteria::fromQueryWithDefaultSchema(
+            request: Query::from(parameters: ['page' => ['number' => '1', 'size' => '20']])
+        );
+
+        /** @And a page carrying a counter the page cannot derive */
+        $page = $criteria->page(items: ['a', 'b'], total: 2)->withMetadata(metadata: ['unread_count' => 7]);
+
+        /** @When rendering the page as a JSON:API response over the notifications base URI */
+        $response = $page->toResponse(baseUri: '/v1/notifications');
+
+        /** @Then the supplied counter renders inside meta, ahead of the pagination contents */
+        self::assertSame([
+            'data'  => ['a', 'b'],
+            'meta'  => [
+                'unread_count' => 7,
+                'total'        => 2,
+                'per_page'     => 20,
+                'total_pages'  => 1,
+                'current_page' => 1,
+                'has_next'     => false,
+                'has_previous' => false
+            ],
+            'links' => [
+                'self'  => '/v1/notifications?page[number]=1&page[size]=20',
+                'first' => '/v1/notifications?page[number]=1&page[size]=20',
+                'last'  => '/v1/notifications?page[number]=1&page[size]=20'
+            ]
+        ], json_decode($response->getBody()->getContents(), true));
+
+        /** @And the RFC 8288 Link header still folds every present relation */
+        self::assertSame(implode(', ', [
+            '</v1/notifications?page[number]=1&page[size]=20>; rel="self"',
+            '</v1/notifications?page[number]=1&page[size]=20>; rel="first"',
+            '</v1/notifications?page[number]=1&page[size]=20>; rel="last"'
+        ]), $response->getHeaderLine('Link'));
     }
 
     public function testNavigationWhenMiddlePageGivenThenTheFirstTargetPointsAtTheFirstPage(): void
