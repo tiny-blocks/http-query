@@ -510,6 +510,40 @@ total).
 | `next`   | The next page.     |
 | `last`   | The last page.     |
 
+#### Adding your own meta contents
+
+A page derives its own `meta` from the pagination. When the endpoint owns a counter the page cannot derive, an unread
+total for example, `withMetadata` returns a copy carrying it. The value renders inside `meta`, so the response keeps the
+single JSON:API envelope and the RFC 8288 `Link` header. Both pagination approaches expose it.
+
+```php
+<?php
+
+declare(strict_types=1);
+
+use TinyBlocks\HttpQuery\Cursor\Keyset;
+
+/** @var Keyset $keyset */
+/** @var iterable<array{id: int, created_at: string}> $items */
+$response = $keyset->page(items: $items)
+    ->withMetadata(metadata: ['unread_count' => 7])
+    ->toResponse(baseUri: '/v1/notifications');
+```
+
+```json
+{
+    "meta": {
+        "unread_count": 7,
+        "per_page": 20,
+        "has_next": true
+    }
+}
+```
+
+The supplied entries come first, in the order they were given, and the pagination entries come last. A supplied key that
+repeats a pagination key never shadows it, so `withMetadata(metadata: ['per_page' => 99])` leaves `per_page` on the real
+page size. Calling it more than once accumulates.
+
 ## FAQ
 
 ### 01. Why does the library never touch a data store?
