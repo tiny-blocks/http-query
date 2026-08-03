@@ -533,15 +533,15 @@ $response = $keyset->page(items: $items)
 ```json
 {
     "meta": {
-        "unread_count": 7,
         "per_page": 20,
-        "has_next": true
+        "has_next": true,
+        "unread_count": 7
     }
 }
 ```
 
-The supplied entries come first, in the order they were given, and the pagination entries come last. A supplied key that
-repeats a pagination key never shadows it, so `withMetadata(metadata: ['per_page' => 99])` leaves `per_page` on the real
+The pagination entries come first, and the supplied ones follow in the order they were given. A supplied key that
+repeats a pagination key is discarded, so `withMetadata(metadata: ['per_page' => 99])` leaves `per_page` on the real
 page size. Calling it more than once accumulates.
 
 ## FAQ
