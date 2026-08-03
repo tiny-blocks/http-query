@@ -26,6 +26,24 @@ final class PageTest extends TestCase
         $this->filter = Group::none();
     }
 
+    public function testMapWhenPageCarriesMetadataThenTheCopyKeepsIt(): void
+    {
+        /** @Given a cursor page carrying a counter the page cannot derive */
+        $page = Page::from(
+            sort: $this->sort,
+            items: [10, 20],
+            filter: $this->filter,
+            keysOf: static fn(int $element): array => [$element],
+            pagination: Pagination::from(cursor: Token::none(), perPage: 2)
+        )->withMetadata(metadata: ['unread_count' => 7]);
+
+        /** @When the items are projected through a transformation */
+        $mapped = $page->map(transformation: static fn(int $element): int => ($element * 2));
+
+        /** @Then the copy keeps the supplied metadata ahead of the pagination contents */
+        self::assertSame(['unread_count' => 7, 'per_page' => 2, 'has_next' => false], $mapped->metadata());
+    }
+
     public function testNavigationWhenNoExtraElementThenHasNoNextPage(): void
     {
         /** @Given a keyset pagination with an absent incoming cursor and a page size of two */
@@ -51,6 +69,29 @@ final class PageTest extends TestCase
 
         /** @And the metadata reports no next page in grouped key order (counts and sizes, then the boolean flags) */
         self::assertSame(['per_page' => 2, 'has_next' => false], $page->metadata());
+    }
+
+    public function testWithMetadataWhenAppliedTwiceThenBothEntriesAreKept(): void
+    {
+        /** @Given a cursor page with no supplied metadata */
+        $page = Page::from(
+            sort: $this->sort,
+            items: [10, 20],
+            filter: $this->filter,
+            keysOf: static fn(int $element): array => [$element],
+            pagination: Pagination::from(cursor: Token::none(), perPage: 2)
+        );
+
+        /** @When metadata is supplied twice */
+        $counted = $page->withMetadata(metadata: ['unread_count' => 7])->withMetadata(metadata: ['muted_count' => 3]);
+
+        /** @Then both entries reach the meta contents, in the order they were supplied */
+        self::assertSame([
+            'unread_count' => 7,
+            'muted_count'  => 3,
+            'per_page'     => 2,
+            'has_next'     => false
+        ], $counted->metadata());
     }
 
     public function testToResponseWhenFirstCursorPageThenSelfLinkIsCursorStyle(): void
@@ -79,6 +120,24 @@ final class PageTest extends TestCase
                 'next' => sprintf('/v1/orders?page[cursor]=%s&page[size]=2', Token::fromKeys(keys: [20])->toString())
             ]
         ], json_decode($response->getBody()->getContents(), true));
+    }
+
+    public function testWithMetadataWhenAKeyCollidesThenThePaginationEntryWins(): void
+    {
+        /** @Given a cursor page with a page size of two */
+        $page = Page::from(
+            sort: $this->sort,
+            items: [10, 20],
+            filter: $this->filter,
+            keysOf: static fn(int $element): array => [$element],
+            pagination: Pagination::from(cursor: Token::none(), perPage: 2)
+        );
+
+        /** @When metadata reusing a pagination key is supplied */
+        $counted = $page->withMetadata(metadata: ['per_page' => 99]);
+
+        /** @Then the pagination entry stands and the supplied value never shadows it */
+        self::assertSame(['per_page' => 2, 'has_next' => false], $counted->metadata());
     }
 
     public function testToResponseWhenCursorPageGivenThenRendersBodyAndLinkHeader(): void
@@ -143,6 +202,47 @@ final class PageTest extends TestCase
             ),
             $targets->first()
         );
+    }
+
+    public function testWithMetadataWhenRenderedThenMetaCarriesItAndTheLinkHeaderHolds(): void
+    {
+        /** @Given a cursor page carrying a counter the page cannot derive */
+        $page = Page::from(
+            sort: $this->sort,
+            items: [10, 20, 30],
+            filter: $this->filter,
+            keysOf: static fn(int $element): array => [$element],
+            pagination: Pagination::from(cursor: Token::none(), perPage: 2)
+        )->withMetadata(metadata: ['unread_count' => 7]);
+
+        /** @When rendering the cursor page as a JSON:API response over the notifications base URI */
+        $response = $page->toResponse(baseUri: '/v1/notifications');
+
+        /** @Then the supplied counter renders inside meta, ahead of the pagination contents */
+        self::assertSame([
+            'data'  => [10, 20],
+            'meta'  => [
+                'unread_count' => 7,
+                'per_page'     => 2,
+                'has_next'     => true
+            ],
+            'links' => [
+                'self' => '/v1/notifications?page[size]=2',
+                'next' => sprintf(
+                    '/v1/notifications?page[cursor]=%s&page[size]=2',
+                    Token::fromKeys(keys: [20])->toString()
+                )
+            ]
+        ], json_decode($response->getBody()->getContents(), true));
+
+        /** @And the RFC 8288 Link header still folds the self and next relations */
+        self::assertSame(implode(', ', [
+            '</v1/notifications?page[size]=2>; rel="self"',
+            sprintf(
+                '</v1/notifications?page[cursor]=%s&page[size]=2>; rel="next"',
+                Token::fromKeys(keys: [20])->toString()
+            )
+        ]), $response->getHeaderLine('Link'));
     }
 
     public function testMapWhenTransformationGivenThenProjectsItemsAndPreservesTheCursor(): void

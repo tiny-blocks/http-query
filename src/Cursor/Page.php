@@ -23,6 +23,7 @@ final readonly class Page
 {
     /**
      * @param Collection<TValue> $items
+     * @param array<string, mixed> $extraMetadata
      */
     private function __construct(
         private Sort $sort,
@@ -30,7 +31,8 @@ final readonly class Page
         private Filter $filter,
         private bool $hasNext,
         private Token $nextCursor,
-        private Pagination $pagination
+        private Pagination $pagination,
+        private array $extraMetadata
     ) {
     }
 
@@ -66,7 +68,8 @@ final readonly class Page
             filter: $filter,
             hasNext: $seek->hasNext(),
             nextCursor: $seek->next(),
-            pagination: $pagination
+            pagination: $pagination,
+            extraMetadata: []
         );
     }
 
@@ -88,7 +91,8 @@ final readonly class Page
             filter: $this->filter,
             hasNext: $this->hasNext,
             nextCursor: $this->nextCursor,
-            pagination: $this->pagination
+            pagination: $this->pagination,
+            extraMetadata: $this->extraMetadata
         );
     }
 
@@ -127,12 +131,16 @@ final readonly class Page
     /**
      * Returns the cursor page as the JSON:API meta contents.
      *
-     * @return array<string, int|bool> The meta contents, counts and sizes first, then the boolean
-     * flags, each by ascending key-name length.
+     * <p>Any metadata supplied through withMetadata comes first, in the order it was given. The
+     * pagination contents come last, so a supplied key never shadows them.</p>
+     *
+     * @return array<string, mixed> The meta contents, the supplied metadata first, then the
+     * pagination counts and sizes, then the boolean flags, each by ascending key-name length.
      */
     public function metadata(): array
     {
         return [
+            ...$this->extraMetadata,
             'per_page' => $this->pagination->limit(),
             'has_next' => $this->hasNext
         ];
@@ -164,6 +172,29 @@ final readonly class Page
             baseUri: $baseUri,
             metadata: $this->metadata(),
             navigation: $this->navigation()
+        );
+    }
+
+    /**
+     * Returns a copy of the cursor page carrying the supplied metadata in its meta contents.
+     *
+     * <p>The supplied metadata is the place for a counter the consumer owns and the page cannot
+     * derive, an unread total for example. It renders inside meta, so the response keeps the
+     * single JSON:API envelope and the RFC 8288 Link header.</p>
+     *
+     * @param array<string, mixed> $metadata The metadata added to the meta contents.
+     * @return Page<TValue> A copy carrying the supplied metadata, preserving the items and the cursor.
+     */
+    public function withMetadata(array $metadata): Page
+    {
+        return new Page(
+            sort: $this->sort,
+            items: $this->items,
+            filter: $this->filter,
+            hasNext: $this->hasNext,
+            nextCursor: $this->nextCursor,
+            pagination: $this->pagination,
+            extraMetadata: [...$this->extraMetadata, ...$metadata]
         );
     }
 }
