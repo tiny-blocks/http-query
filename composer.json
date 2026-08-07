@@ -26,16 +26,16 @@
     },
     "require": {
         "php": "^8.5",
-        "tiny-blocks/collection": "^2.5",
-        "tiny-blocks/http": "^6.4"
+        "tiny-blocks/collection": "^2.6",
+        "tiny-blocks/http": "^7.0"
     },
     "require-dev": {
         "ergebnis/composer-normalize": "^2.52",
-        "infection/infection": "^0.33",
+        "infection/infection": "^0.34",
         "nyholm/psr7": "^1.8",
         "phpstan/phpstan": "^2.2",
-        "phpunit/phpunit": "^13.1",
-        "slevomat/coding-standard": "^8.30",
+        "phpunit/phpunit": "^13.2",
+        "slevomat/coding-standard": "^8.31",
         "squizlabs/php_codesniffer": "^4.0"
     },
     "minimum-stability": "stable",
