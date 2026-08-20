@@ -3,7 +3,7 @@ parameters:
     paths:
         - src
         - tests
-    reportUnmatchedIgnoredErrors: true
+    tmpDir: reports/phpstan
     ignoreErrors:
         # The compared values are a list of strings carried on a value-object constructor.
         - identifier: missingType.iterableValue
@@ -65,3 +65,4 @@ parameters:
         # Test fixtures and data providers carry raw arrays at the test boundary.
         - identifier: missingType.iterableValue
           path: tests
+    reportUnmatchedIgnoredErrors: true
