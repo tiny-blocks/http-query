@@ -52,6 +52,8 @@ final class ValueKindTest extends TestCase
     public static function matchingValues(): array
     {
         return [
+            'Lowercase UUID'      => ['kind' => ValueKind::UUID, 'value' => '01900000-0000-7099-8000-000000000001'],
+            'Uppercase UUID'      => ['kind' => ValueKind::UUID, 'value' => '0190A3F2-1B2C-7D4E-8F60-123456789ABC'],
             'Non-empty string'    => ['kind' => ValueKind::STRING, 'value' => 'paid'],
             'Positive integer'    => ['kind' => ValueKind::INTEGER, 'value' => '42'],
             'Negative integer'    => ['kind' => ValueKind::INTEGER, 'value' => '-7'],
@@ -65,6 +67,11 @@ final class ValueKindTest extends TestCase
     public static function mismatchingValues(): array
     {
         return [
+            'Free-form identifier' => ['kind' => ValueKind::UUID, 'value' => 'not-a-uuid'],
+            'UUID without hyphens' => ['kind' => ValueKind::UUID, 'value' => '01900000000070998000000000000001'],
+            'UUID leading text'    => ['kind' => ValueKind::UUID, 'value' => 'x01900000-0000-7099-8000-000000000001'],
+            'UUID trailing text'   => ['kind' => ValueKind::UUID, 'value' => '01900000-0000-7099-8000-000000000001x'],
+            'Non-hexadecimal UUID' => ['kind' => ValueKind::UUID, 'value' => '0190000g-0000-7099-8000-000000000001'],
             'Empty string'         => ['kind' => ValueKind::STRING, 'value' => ''],
             'Non-numeric integer'  => ['kind' => ValueKind::INTEGER, 'value' => 'abc'],
             'Decimal integer'      => ['kind' => ValueKind::INTEGER, 'value' => '4.2'],

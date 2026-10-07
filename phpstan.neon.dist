@@ -62,6 +62,12 @@ parameters:
         # The cursor codec encodes and decodes opaque key values whose types are not known.
         - identifier: missingType.iterableValue
           path: src/Internal/Cursor/CursorCodec.php
+        # The cursor key kinds are a map of field to ValueKind carried on an internal constructor, so
+        # the kind read back from it is widened to mixed.
+        - identifier: missingType.iterableValue
+          path: src/Internal/Cursor/CursorKeys.php
+        - identifier: argument.type
+          path: src/Internal/Cursor/CursorKeys.php
         # Test fixtures and data providers carry raw arrays at the test boundary.
         - identifier: missingType.iterableValue
           path: tests

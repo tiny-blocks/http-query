@@ -18,7 +18,6 @@ use TinyBlocks\HttpQuery\Exceptions\SortFieldNotAllowed;
 use TinyBlocks\HttpQuery\Exceptions\SortIsRequired;
 use TinyBlocks\HttpQuery\Filter;
 use TinyBlocks\HttpQuery\Internal\Query;
-use TinyBlocks\HttpQuery\Order;
 use TinyBlocks\HttpQuery\Schema;
 use TinyBlocks\HttpQuery\Sort;
 
@@ -45,9 +44,10 @@ final readonly class Criteria
      * Creates a Criteria from the schema and the request.
      *
      * <p>It parses the request query string and validates it against the schema, the incoming cursor
-     * included: a token that cannot be decoded into one value per effective sort order is rejected
-     * here, and never later while the seek is being built. The pagination always carries the
-     * incoming cursor token and the page size.</p>
+     * included: a token that cannot be decoded into one value per effective sort order, or whose
+     * value breaks the kind the schema declares for its cursor key, is rejected here, and never
+     * later while the seek is being built. The pagination always carries the incoming cursor token
+     * and the page size.</p>
      *
      * @param Schema $schema The query contract the request is validated against.
      * @param ServerRequestInterface $request The incoming PSR-7 server request.
@@ -60,15 +60,12 @@ final readonly class Criteria
      * @throws FilterOperatorNotAllowed If a comparison uses an operator not allowed for its field.
      * @throws FilterValueNotAllowed If a compared value falls outside the permitted set or kind.
      * @throws SortFieldNotAllowed If the sort orders by a field that was never declared sortable.
-     * @throws CursorIsInvalid If the incoming cursor cannot be decoded into one value per sort order.
+     * @throws CursorIsInvalid If the incoming cursor is not one value per sort order or breaks a cursor key kind.
      */
     public static function fromQuery(Schema $schema, ServerRequestInterface $request): Criteria
     {
         $query = Query::from(schema: $schema, request: $request);
-        $cursor = Token::from(token: $query->cursorToken());
-        $fields = array_map(static fn(Order $order): string => $order->field(), $query->sort()->orders());
-
-        $cursor->keyedBy(fields: $fields);
+        $cursor = $schema->cursorFor(sort: $query->sort(), cursor: Token::from(token: $query->cursorToken()));
 
         return new Criteria(
             sort: $query->sort(),
