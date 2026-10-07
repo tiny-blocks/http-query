@@ -49,9 +49,10 @@ parameters, validate them against the schema, and expose the same `comparisons()
 
 `Schema` is the contract of the query an endpoint accepts. `filterable` declares a field with its permitted operators
 and, optionally, the permitted values and the `ValueKind` every value must match. `sortable` declares the fields the
-client may sort by. `defaultSort` declares the sort applied when the client sends none. `maxPerPage` and
-`defaultPerPage` bound the page size. The query parameter names follow JSON:API and are fixed: `filter`, `sort`, and the
-`page` family.
+client may sort by. `cursorKey` declares the `ValueKind` every cursor value of a field must match (see
+[Cursor pagination](#cursor-pagination)). `defaultSort` declares the sort applied when the client sends none.
+`maxPerPage` and `defaultPerPage` bound the page size. The query parameter names follow JSON:API and are fixed:
+`filter`, `sort`, and the `page` family.
 
 ```php
 <?php
@@ -156,11 +157,12 @@ while a binary collation matches exactly. Declare the collation the endpoint pro
 `ValueKind` is the kind a value is validated against. For the multivalued operators (`=in=`, `=out=`) every value is
 checked.
 
-| Kind                  | Matches                                                |
-|-----------------------|--------------------------------------------------------|
-| `ValueKind::STRING`   | A non-empty string.                                    |
-| `ValueKind::INTEGER`  | An optionally signed sequence of digits, `-7` or `42`. |
-| `ValueKind::DATETIME` | An ISO-8601 date or date-time, `2023-01-15T10:30:00Z`. |
+| Kind                  | Matches                                                                          |
+|-----------------------|----------------------------------------------------------------------------------|
+| `ValueKind::UUID`     | A hyphenated UUID in either letter case, `01900000-0000-7099-8000-000000000001`. |
+| `ValueKind::STRING`   | A non-empty string.                                                              |
+| `ValueKind::INTEGER`  | An optionally signed sequence of digits, `-7` or `42`.                           |
+| `ValueKind::DATETIME` | An ISO-8601 date or date-time, `2023-01-15T10:30:00Z`.                           |
 
 ### Sorting
 
@@ -290,6 +292,31 @@ $cursorPage->map(transformation: static fn(array $row): array => ['id' => $row['
 ```
 
 An invalid cursor token raises `CursorIsInvalid` when it is decoded.
+
+A cursor token round-trips through the client, so its values are untrusted input. `cursorKey` declares the `ValueKind`
+every cursor value of a field must match, and `Criteria::fromQuery` then raises `CursorIsInvalid` for a token whose
+value for that field does not match, before the value reaches the store. A forged identifier is refused at parse
+instead of failing inside a `UUID_TO_BIN` binding.
+
+```php
+<?php
+
+declare(strict_types=1);
+
+use TinyBlocks\HttpQuery\Schema;
+use TinyBlocks\HttpQuery\Sort;
+use TinyBlocks\HttpQuery\ValueKind;
+
+$schema = Schema::create()
+    ->sortable(fields: ['created_at', 'id'])
+    ->cursorKey(field: 'id', valueKind: ValueKind::UUID)
+    ->defaultSort(sort: Sort::fromExpression(expression: '-created_at,-id'));
+```
+
+A field without a declared kind is not checked, and an absent cursor or a null value carries no key, so it always
+passes. The kind describes the value as the cursor carries it, which is the form read from the source rows, not the
+form a client sends in a filter. A `ValueKind::DATETIME` key therefore needs ISO-8601 values in the rows (or a
+`keysOf` that emits them), since a raw SQL timestamp such as `2026-01-15 10:30:00.000000` does not match it.
 
 ### Building the store query
 
@@ -581,7 +608,8 @@ the page's own approach.
 
 Field and operator names are validated against the `Schema` allowlist while parsing, so only declared identifiers ever
 reach your store. Comparison and cursor values are returned as data for you to bind as parameters, and the library
-builds no SQL. A cursor token is decoded only as a list of scalar values. Any unsafe character in the filter and sort
+builds no SQL. A cursor token is decoded only as a list of scalar values, and a value whose field declares a
+`cursorKey` kind must match it. Any unsafe character in the filter and sort
 echoed into the `links` object and the `Link` header is percent-encoded. Binding the values is still your
 responsibility.
 
