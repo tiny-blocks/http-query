@@ -4,6 +4,8 @@ declare(strict_types=1);
 
 namespace TinyBlocks\HttpQuery;
 
+use TinyBlocks\HttpQuery\Cursor\Token;
+use TinyBlocks\HttpQuery\Exceptions\CursorIsInvalid;
 use TinyBlocks\HttpQuery\Exceptions\FilterFieldNotAllowed;
 use TinyBlocks\HttpQuery\Exceptions\FilterOperatorNotAllowed;
 use TinyBlocks\HttpQuery\Exceptions\FilterShapeNotSupported;
@@ -12,12 +14,14 @@ use TinyBlocks\HttpQuery\Exceptions\PageSizeOutOfRange;
 use TinyBlocks\HttpQuery\Exceptions\SortFieldNotAllowed;
 use TinyBlocks\HttpQuery\Internal\AllowedFilters;
 use TinyBlocks\HttpQuery\Internal\Conjunction;
+use TinyBlocks\HttpQuery\Internal\Cursor\CursorKeys;
 
 /**
  * Declarative contract of the query an endpoint accepts, used to validate an incoming request.
  *
  * <p>It declares the filterable fields with their permitted operators, values, and kinds, the
- * client-sortable fields, the sort applied when the client sends none, and the page-size bounds.
+ * client-sortable fields, the kind each cursor key value must match, the sort applied when the
+ * client sends none, and the page-size bounds.
  * The query parameter names follow JSON:API and are fixed: <code>filter</code>, <code>sort</code>,
  * and the <code>page</code> family. The default page size is 20 and the maximum is 100.</p>
  */
@@ -26,6 +30,7 @@ final readonly class Schema
     private function __construct(
         private AllowedFilters $allowed,
         private Sort $byDefault,
+        private CursorKeys $cursorKeys,
         private int $maxPerPage,
         private int $defaultPerPage,
         private array $sortableFields,
@@ -70,6 +75,7 @@ final readonly class Schema
         return new Schema(
             allowed: AllowedFilters::createFromEmpty(),
             byDefault: Sort::fromExpression(expression: ''),
+            cursorKeys: CursorKeys::createFromEmpty(),
             maxPerPage: 100,
             defaultPerPage: 20,
             sortableFields: [],
@@ -110,9 +116,52 @@ final readonly class Schema
         return new Schema(
             allowed: $this->allowed,
             byDefault: $this->byDefault,
+            cursorKeys: $this->cursorKeys,
             maxPerPage: $this->maxPerPage,
             defaultPerPage: $this->defaultPerPage,
             sortableFields: $fields,
+            allowsDisjunction: $this->allowsDisjunction
+        );
+    }
+
+    /**
+     * Returns the incoming cursor, validated against the effective sort and the declared cursor keys.
+     *
+     * <p>The cursor must decode into one value per effective sort order, and every value of a field
+     * declared through <code>cursorKey</code> must match the declared kind. An absent cursor and a
+     * null value carry no key, so they always pass. A field without a declared kind is not checked.</p>
+     *
+     * @param Sort $sort The effective sort the cursor values are keyed by.
+     * @param Token $cursor The incoming cursor read from the request.
+     * @return Token The incoming cursor, unchanged once validated.
+     * @throws CursorIsInvalid If the cursor is not one value per sort order or breaks a cursor key kind.
+     */
+    public function cursorFor(Sort $sort, Token $cursor): Token
+    {
+        return $this->cursorKeys->permit(sort: $sort, cursor: $cursor);
+    }
+
+    /**
+     * Returns a copy of the Schema declaring the kind every cursor value of the field must match.
+     *
+     * <p>A cursor token round-trips through the client, so its values are untrusted input. A cursor
+     * whose value for the field does not match the kind is rejected while the request is parsed,
+     * before the value reaches the store. The kind describes the value as the cursor carries it,
+     * that is as it was read from the source rows.</p>
+     *
+     * @param string $field The ordering field whose cursor values are checked.
+     * @param ValueKind $valueKind The kind every cursor value of the field must match.
+     * @return Schema A copy carrying the original contract plus the cursor key kind.
+     */
+    public function cursorKey(string $field, ValueKind $valueKind): Schema
+    {
+        return new Schema(
+            allowed: $this->allowed,
+            byDefault: $this->byDefault,
+            cursorKeys: $this->cursorKeys->with(kind: $valueKind, field: $field),
+            maxPerPage: $this->maxPerPage,
+            defaultPerPage: $this->defaultPerPage,
+            sortableFields: $this->sortableFields,
             allowsDisjunction: $this->allowsDisjunction
         );
     }
@@ -140,6 +189,7 @@ final readonly class Schema
                 operators: $operators
             ),
             byDefault: $this->byDefault,
+            cursorKeys: $this->cursorKeys,
             maxPerPage: $this->maxPerPage,
             defaultPerPage: $this->defaultPerPage,
             sortableFields: $this->sortableFields,
@@ -159,6 +209,7 @@ final readonly class Schema
         return new Schema(
             allowed: $this->allowed,
             byDefault: $this->byDefault,
+            cursorKeys: $this->cursorKeys,
             maxPerPage: $maxPerPage,
             defaultPerPage: $this->defaultPerPage,
             sortableFields: $this->sortableFields,
@@ -177,6 +228,7 @@ final readonly class Schema
         return new Schema(
             allowed: $this->allowed,
             byDefault: $sort,
+            cursorKeys: $this->cursorKeys,
             maxPerPage: $this->maxPerPage,
             defaultPerPage: $this->defaultPerPage,
             sortableFields: $this->sortableFields,
@@ -243,6 +295,7 @@ final readonly class Schema
         return new Schema(
             allowed: $this->allowed,
             byDefault: $this->byDefault,
+            cursorKeys: $this->cursorKeys,
             maxPerPage: $this->maxPerPage,
             defaultPerPage: $defaultPerPage,
             sortableFields: $this->sortableFields,
@@ -260,6 +313,7 @@ final readonly class Schema
         return new Schema(
             allowed: $this->allowed,
             byDefault: $this->byDefault,
+            cursorKeys: $this->cursorKeys,
             maxPerPage: $this->maxPerPage,
             defaultPerPage: $this->defaultPerPage,
             sortableFields: $this->sortableFields,
