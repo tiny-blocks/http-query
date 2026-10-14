@@ -4,9 +4,11 @@ declare(strict_types=1);
 
 namespace Test\TinyBlocks\HttpQuery\Unit\Offset;
 
+use PHPUnit\Framework\Attributes\DataProvider;
 use PHPUnit\Framework\TestCase;
 use Test\TinyBlocks\HttpQuery\Models\Query;
 use TinyBlocks\HttpQuery\Comparison;
+use TinyBlocks\HttpQuery\Exceptions\PageNumberOutOfRange;
 use TinyBlocks\HttpQuery\Exceptions\PageSizeOutOfRange;
 use TinyBlocks\HttpQuery\Exceptions\SortFieldNotAllowed;
 use TinyBlocks\HttpQuery\Offset\Criteria;
@@ -87,6 +89,18 @@ final class CriteriaTest extends TestCase
         self::assertSame(100, $criteria->limit()->toInteger());
     }
 
+    public function testFromQueryWhenPageNumberAtCeilingThenOffsetFitsAnInteger(): void
+    {
+        /** @Given query parameters carrying the last page whose offset fits an integer */
+        $query = Query::from(parameters: ['page' => ['number' => '461168601842738791']]);
+
+        /** @When building the criteria from the query */
+        $criteria = Criteria::fromQueryWithDefaultSchema(request: $query);
+
+        /** @Then the offset is the largest multiple of the default page size below the largest integer */
+        self::assertSame(9223372036854775800, $criteria->offset());
+    }
+
     public function testSortWhenClientSortsAllowedFieldsThenReturnsTheClientSort(): void
     {
         /** @Given a schema allowing the client to sort by two fields */
@@ -159,6 +173,20 @@ final class CriteriaTest extends TestCase
         Criteria::fromQuery(schema: $schema, request: $query);
     }
 
+    #[DataProvider('pageNumbersBeyondTheCeiling')]
+    public function testFromQueryWhenPageNumberBeyondCeilingThenThrowsPageNumberOutOfRange(string $pageNumber): void
+    {
+        /** @Given query parameters carrying a page number whose offset does not fit an integer */
+        $query = Query::from(parameters: ['page' => ['number' => $pageNumber]]);
+
+        /** @Then an exception carrying the ceiling for the default page size is raised */
+        $this->expectException(PageNumberOutOfRange::class);
+        $this->expectExceptionMessage('must be less than or equal to 461168601842738791.');
+
+        /** @When building the criteria from the query */
+        Criteria::fromQueryWithDefaultSchema(request: $query);
+    }
+
     public function testFromQueryWhenFilterSortAndPageGivenThenEachSpecificationIsValidated(): void
     {
         /** @Given a schema allowing the filtered and sorted fields */
@@ -205,5 +233,14 @@ final class CriteriaTest extends TestCase
 
         /** @When building the criteria from the query */
         Criteria::fromQuery(schema: $schema, request: $query);
+    }
+
+    public static function pageNumbersBeyondTheCeiling(): array
+    {
+        return [
+            'First page past the ceiling' => ['pageNumber' => '461168601842738792'],
+            'Largest integer'             => ['pageNumber' => '9223372036854775807'],
+            'Beyond the integer range'    => ['pageNumber' => '99999999999999999999']
+        ];
     }
 }

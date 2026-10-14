@@ -52,7 +52,7 @@ final readonly class Criteria
      * @return Criteria The criteria carrying the validated comparisons, the effective sort, and the pagination.
      * @throws FilterExpressionIsInvalid If the filter expression cannot be parsed.
      * @throws SortExpressionIsInvalid If the sort expression cannot be parsed.
-     * @throws PageNumberOutOfRange If the page number is less than 1.
+     * @throws PageNumberOutOfRange If the page number is less than 1 or its offset does not fit in an integer.
      * @throws PageSizeOutOfRange If the page size falls outside the valid range.
      * @throws FilterShapeNotSupported If the filter is not a comparison or an AND group of comparisons.
      * @throws FilterFieldNotAllowed If a comparison targets a field that was never allowed.
@@ -84,7 +84,7 @@ final readonly class Criteria
      * @return Criteria The criteria carrying the validated comparisons, the effective sort, and the pagination.
      * @throws FilterExpressionIsInvalid If the filter expression cannot be parsed.
      * @throws SortExpressionIsInvalid If the sort expression cannot be parsed.
-     * @throws PageNumberOutOfRange If the page number is less than 1.
+     * @throws PageNumberOutOfRange If the page number is less than 1 or its offset does not fit in an integer.
      * @throws PageSizeOutOfRange If the page size falls outside the valid range.
      * @throws FilterShapeNotSupported If the filter is not a comparison or an AND group of comparisons.
      * @throws FilterFieldNotAllowed If a comparison targets a field that was never allowed.

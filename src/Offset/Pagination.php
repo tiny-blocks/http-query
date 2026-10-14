@@ -29,7 +29,7 @@ final readonly class Pagination implements PaginationContract
      * @param int $page The one-based page number.
      * @param int $perPage The page size.
      * @return Pagination The pagination whose offset is derived from the page and the page size.
-     * @throws PageNumberOutOfRange If the page number is less than 1.
+     * @throws PageNumberOutOfRange If the page number is less than 1 or its offset does not fit in an integer.
      * @throws PageSizeOutOfRange If the page size is less than 1.
      */
     public static function fromPage(int $page, int $perPage): Pagination
@@ -46,7 +46,7 @@ final readonly class Pagination implements PaginationContract
      * @param int $limit The maximum number of elements per page.
      * @param int $offset The zero-based offset.
      * @return Pagination The pagination carrying the offset and the limit.
-     * @throws OffsetOutOfRange If the offset is less than 0.
+     * @throws OffsetOutOfRange If the offset is less than 0 or is the largest integer.
      * @throws PageSizeOutOfRange If the limit is less than 1.
      */
     public static function fromOffset(int $limit, int $offset): Pagination

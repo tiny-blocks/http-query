@@ -14,7 +14,9 @@ final readonly class PageCount
 
     public static function from(Limit $limit, Total $total): PageCount
     {
-        return new PageCount(value: (int)ceil($total->value() / $limit->value()));
+        $hasPartialPage = ($total->value() % $limit->value()) > 0;
+
+        return new PageCount(value: (intdiv($total->value(), $limit->value()) + ($hasPartialPage ? 1 : 0)));
     }
 
     public function value(): int
