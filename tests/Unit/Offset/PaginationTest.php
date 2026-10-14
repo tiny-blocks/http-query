@@ -105,6 +105,18 @@ final class PaginationTest extends TestCase
         self::assertSame(20, $pagination->limit());
     }
 
+    public function testFromPageWhenPageAtCeilingGivenThenOffsetFitsAnInteger(): void
+    {
+        /** @When building a pagination from the last page whose offset fits an integer */
+        $pagination = Pagination::fromPage(page: 461168601842738791, perPage: 20);
+
+        /** @Then the page number is preserved */
+        self::assertSame(461168601842738791, $pagination->page());
+
+        /** @And the offset is the largest multiple of the page size below the largest integer */
+        self::assertSame(9223372036854775800, $pagination->offset());
+    }
+
     public function testFromPageWhenPageBelowOneGivenThenPageNumberOutOfRange(): void
     {
         /** @Then an exception indicating the page number is out of range is raised */
@@ -155,5 +167,75 @@ final class PaginationTest extends TestCase
 
         /** @Then it renders the page number and the page size in the JSON:API page family */
         self::assertSame('page[number]=3&page[size]=20', $queryString);
+    }
+
+    public function testFromOffsetWhenOffsetIsLargestIntegerThenOffsetOutOfRange(): void
+    {
+        /** @Then an exception carrying the offset and the largest offset accepted is raised */
+        $this->expectException(OffsetOutOfRange::class);
+        $this->expectExceptionMessage(
+            'Offset <9223372036854775807> must be less than or equal to 9223372036854775806.'
+        );
+
+        /** @When building a pagination from the largest integer offset */
+        Pagination::fromOffset(limit: 1, offset: PHP_INT_MAX);
+    }
+
+    public function testFromPageWhenPageAboveCeilingGivenThenPageNumberOutOfRange(): void
+    {
+        /** @Then an exception carrying the page number and the ceiling for the page size is raised */
+        $this->expectException(PageNumberOutOfRange::class);
+        $this->expectExceptionMessage(
+            'Page number <461168601842738792> must be less than or equal to 461168601842738791.'
+        );
+
+        /** @When building a pagination from the first page whose offset does not fit an integer */
+        Pagination::fromPage(page: 461168601842738792, perPage: 20);
+    }
+
+    public function testFromPageWhenLargestIntegerPageGivenThenPageNumberOutOfRange(): void
+    {
+        /** @Then an exception carrying the page number and the ceiling for the page size is raised */
+        $this->expectException(PageNumberOutOfRange::class);
+        $this->expectExceptionMessage(
+            'Page number <9223372036854775807> must be less than or equal to 461168601842738791.'
+        );
+
+        /** @When building a pagination from the largest integer page */
+        Pagination::fromPage(page: PHP_INT_MAX, perPage: 20);
+    }
+
+    public function testFromPageWhenPerPageIsLargestIntegerThenSecondPageIsOutOfRange(): void
+    {
+        /** @Then an exception stating that only the first page fits is raised */
+        $this->expectException(PageNumberOutOfRange::class);
+        $this->expectExceptionMessage('Page number <2> must be less than or equal to 1.');
+
+        /** @When building a pagination from the second page of the largest page size */
+        Pagination::fromPage(page: 2, perPage: PHP_INT_MAX);
+    }
+
+    public function testFromPageWhenLargestIntegerPageAndPerPageIsOneThenOffsetIsOneBelowIt(): void
+    {
+        /** @When building a pagination from the largest integer page with a page size of one */
+        $pagination = Pagination::fromPage(page: PHP_INT_MAX, perPage: 1);
+
+        /** @Then the page number is the largest integer */
+        self::assertSame(PHP_INT_MAX, $pagination->page());
+
+        /** @And the offset is one below the largest integer */
+        self::assertSame((PHP_INT_MAX - 1), $pagination->offset());
+    }
+
+    public function testFromOffsetWhenOffsetIsOneBelowLargestIntegerThenPageIsLargestInteger(): void
+    {
+        /** @When building a pagination from the largest offset accepted with a limit of one */
+        $pagination = Pagination::fromOffset(limit: 1, offset: (PHP_INT_MAX - 1));
+
+        /** @Then the page number is the largest integer */
+        self::assertSame(PHP_INT_MAX, $pagination->page());
+
+        /** @And the offset is preserved */
+        self::assertSame((PHP_INT_MAX - 1), $pagination->offset());
     }
 }

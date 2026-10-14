@@ -157,12 +157,30 @@ while a binary collation matches exactly. Declare the collation the endpoint pro
 `ValueKind` is the kind a value is validated against. For the multivalued operators (`=in=`, `=out=`) every value is
 checked.
 
-| Kind                  | Matches                                                                          |
-|-----------------------|----------------------------------------------------------------------------------|
-| `ValueKind::UUID`     | A hyphenated UUID in either letter case, `01900000-0000-7099-8000-000000000001`. |
-| `ValueKind::STRING`   | A non-empty string.                                                              |
-| `ValueKind::INTEGER`  | An optionally signed sequence of digits, `-7` or `42`.                           |
-| `ValueKind::DATETIME` | An ISO-8601 date or date-time, `2023-01-15T10:30:00Z`.                           |
+| Kind                  | Matches                                                                           |
+|-----------------------|-----------------------------------------------------------------------------------|
+| `ValueKind::UUID`     | A hyphenated UUID in either letter case, `01900000-0000-7099-8000-000000000001`.  |
+| `ValueKind::STRING`   | A non-empty string.                                                               |
+| `ValueKind::INTEGER`  | An optionally signed sequence of digits that fits in a PHP `int`, `-7` or `42`.   |
+| `ValueKind::DATETIME` | A calendar date or date-time in ISO-8601, `2023-01-15` or `2023-01-15T10:30:00Z`. |
+
+No kind accepts a trailing line break, so `42\n` or a UUID followed by `\n` is refused, and a UUID in URN form
+(`urn:uuid:...`) is refused as well. An `INTEGER` is compared as text against `PHP_INT_MIN` and `PHP_INT_MAX`, so
+`9223372036854775807` and `-9223372036854775808` match while `9223372036854775808` does not, and the consumer can cast
+every accepted value to `int` without overflow. Leading zeros remain accepted.
+
+A `DATETIME` is checked against the calendar and the clock, not only its shape:
+
+| Part     | Accepted                                                                                        |
+|----------|-------------------------------------------------------------------------------------------------|
+| Date     | A day that exists in the calendar, from `0001-01-01` to `9999-12-31` (`2026-02-30` is refused). |
+| Time     | An hour from `00` to `23`, a minute and a second from `00` to `59`.                             |
+| Fraction | Optional, from one to nine digits.                                                              |
+| Offset   | Optional, `Z` or `±HH:MM` with the hours from `00` to `23` and the minutes from `00` to `59`.   |
+| Instant  | Shifted to UTC, between `0001-01-01T00:00:00Z` and `9999-12-31T23:59:59.999999999Z`.            |
+
+A date-time without an offset is read as UTC. So `9999-12-31T23:59:59Z` matches, while `9999-12-31T22:00:00-05:00`
+does not, because in UTC it falls in the year 10000.
 
 ### Sorting
 
@@ -213,6 +231,15 @@ $page->hasNext();     # true
 $page->metadata();    # The JSON:API meta contents.
 $page->totalPages();  # 24
 ```
+
+The page number runs from `1` up to a ceiling that depends on the page size: the last page whose zero-based offset
+stays below `PHP_INT_MAX`, that is `intdiv(PHP_INT_MAX - 1, size) + 1`. With the default size of 20 the ceiling is
+`461168601842738791`, and with a size of 1 it is `PHP_INT_MAX` itself. A page number above the ceiling raises
+`PageNumberOutOfRange`, the same exception as a page number below 1, so `page[number]=9223372036854775807` or
+`page[number]=99999999999999999999` is refused before any offset is computed. On the offset side,
+`Offset\Pagination::fromOffset` refuses an offset equal to `PHP_INT_MAX` with `OffsetOutOfRange`, so the page number
+derived back from any accepted offset also fits in an `int`. Every navigation target, the last page included, stays
+within the ceiling, and the total pages are computed in integer arithmetic.
 
 Use `Offset\Criteria::slice` instead of `page` when the total is unknown. The consumer fetches one element beyond the
 page size, and the `Offset\Slice` trims it and reads its presence as the next-page hint.

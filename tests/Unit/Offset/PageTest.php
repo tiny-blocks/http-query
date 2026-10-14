@@ -382,6 +382,26 @@ final class PageTest extends TestCase
         );
     }
 
+    public function testNavigationWhenTotalIsLargestIntegerThenLastPageStaysWithinTheCeiling(): void
+    {
+        /** @Given a criteria on the page before the ceiling with a page size of twenty */
+        $criteria = Criteria::fromQueryWithDefaultSchema(
+            request: Query::from(parameters: ['page' => ['number' => '461168601842738790', 'size' => '20']])
+        );
+
+        /** @When building the page from the largest integer total */
+        $page = $criteria->page(items: ['a'], total: PHP_INT_MAX);
+
+        /** @Then the total number of pages is the ceiling for the page size */
+        self::assertSame(461168601842738791, $page->totalPages());
+
+        /** @And the next pagination points at the ceiling */
+        self::assertSame(461168601842738791, $page->next()?->page());
+
+        /** @And the last pagination points at the ceiling */
+        self::assertSame(9223372036854775800, $page->last()?->offset());
+    }
+
     public function testNavigationWhenMiddlePageGivenThenListsFirstPreviousNextAndLastTargets(): void
     {
         /** @Given a criteria on a middle page of a multi-page result */
@@ -399,5 +419,22 @@ final class PageTest extends TestCase
 
         /** @Then it lists the first, previous, next, and last relations in semantic order */
         self::assertSame(['first', 'prev', 'next', 'last'], $relations);
+    }
+
+    public function testNavigationWhenTotalIsLargestIntegerAndPerPageIsOneThenLastPageIsLargestInteger(): void
+    {
+        /** @Given a criteria on the first page with a page size of one */
+        $criteria = Criteria::fromQueryWithDefaultSchema(
+            request: Query::from(parameters: ['page' => ['number' => '1', 'size' => '1']])
+        );
+
+        /** @When building the page from the largest integer total */
+        $page = $criteria->page(items: ['a'], total: PHP_INT_MAX);
+
+        /** @Then the total number of pages is the largest integer */
+        self::assertSame(PHP_INT_MAX, $page->totalPages());
+
+        /** @And the last pagination points at the largest integer page */
+        self::assertSame(PHP_INT_MAX, $page->last()?->page());
     }
 }
