@@ -131,6 +131,9 @@ contract raises a dedicated exception, each implementing `HttpQueryException`.
 | `FilterOperatorNotAllowed`  | A comparison uses an operator not allowed for its field.                          |
 | `FilterValueNotAllowed`     | A compared value falls outside the permitted set or the expected kind.            |
 
+A filter exception message names the field, the operator, or the value kind, never a compared value or the raw filter
+expression, since a value such as a name or an email may be personal data.
+
 ### Prefix matching with `=sw=`
 
 `=sw=` compares the value as a **literal prefix** of the column. It renders as an anchored `LIKE` so a B-tree index on
@@ -318,7 +321,8 @@ rendered from the same page.
 $cursorPage->map(transformation: static fn(array $row): array => ['id' => $row['id']]);
 ```
 
-An invalid cursor token raises `CursorIsInvalid` when it is decoded.
+An invalid cursor token raises `CursorIsInvalid` when it is decoded. Its message never carries the token, since the
+token encodes the ordering key values of the last row, a client name among them when the listing is sorted by name.
 
 A cursor token round-trips through the client, so its values are untrusted input. `cursorKey` declares the `ValueKind`
 every cursor value of a field must match, and `Criteria::fromQuery` then raises `CursorIsInvalid` for a token whose

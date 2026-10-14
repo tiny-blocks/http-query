@@ -100,6 +100,24 @@ final class CriteriaTest extends TestCase
         $criteria->keyset();
     }
 
+    public function testFromQueryWhenNameCursorBreaksKindThenMessageOmitsTheToken(): void
+    {
+        /** @Given an opaque token carrying a client name and an identifier that is not a UUID */
+        $token = Token::fromKeys(keys: ['Maria Silva', 'not-a-uuid'])->toString();
+
+        /** @And a schema declaring the identifier cursor key as a UUID and a default sort by name */
+        $schema = Schema::create()
+            ->cursorKey(field: 'id', valueKind: ValueKind::UUID)
+            ->defaultSort(sort: Sort::fromExpression(expression: 'name,id'));
+
+        /** @Then an exception carrying neither the token nor the client name is raised */
+        $this->expectException(CursorIsInvalid::class);
+        $this->expectExceptionMessageMatches('/^Cursor token does not match the uuid kind for cursor key <id>\.$/');
+
+        /** @When building the criteria from a request carrying that cursor */
+        Criteria::fromQuery(schema: $schema, request: Query::from(parameters: ['page' => ['cursor' => $token]]));
+    }
+
     public function testFromQueryWhenCursorValueFitsDeclaredKindThenKeysetCarriesIt(): void
     {
         /** @Given an opaque token carrying a store timestamp and a UUID identifier */
@@ -299,12 +317,9 @@ final class CriteriaTest extends TestCase
             ->cursorKey(field: 'id', valueKind: ValueKind::UUID)
             ->defaultSort(sort: Sort::fromExpression(expression: '-created_at,-id'));
 
-        /** @And the reason template naming the token, the kind, and the cursor key */
-        $template = 'Cursor token <%s> does not match the uuid kind for cursor key <id>.';
-
-        /** @Then an exception indicating the cursor token is invalid is raised */
+        /** @Then an exception naming the kind and the cursor key is raised */
         $this->expectException(CursorIsInvalid::class);
-        $this->expectExceptionMessage(sprintf($template, $token));
+        $this->expectExceptionMessage('Cursor token does not match the uuid kind for cursor key <id>.');
 
         /** @When building the criteria from a request carrying that cursor */
         Criteria::fromQuery(schema: $schema, request: Query::from(parameters: ['page' => ['cursor' => $token]]));

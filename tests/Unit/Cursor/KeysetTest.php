@@ -151,7 +151,7 @@ final class KeysetTest extends TestCase
 
         /** @Then an exception indicating the cursor is invalid is raised */
         $this->expectException(CursorIsInvalid::class);
-        $this->expectExceptionMessage('Cursor token <not-a-cursor> is invalid and could not be decoded.');
+        $this->expectExceptionMessage('Cursor token is invalid and could not be decoded.');
 
         /** @When the criteria is parsed from the request */
         Criteria::fromQuery(schema: $this->schema, request: $request);
