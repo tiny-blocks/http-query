@@ -125,9 +125,9 @@ final class FilterTest extends TestCase
         /** @Given a query carrying an OR expression of two comparisons */
         $query = Query::from(parameters: ['filter' => 'a==1,b==2']);
 
-        /** @Then an exception carrying the raw filter query string is raised */
+        /** @Then an exception indicating the filter shape is not supported is raised */
         $this->expectException(FilterShapeNotSupported::class);
-        $this->expectExceptionMessage('Filter shape <a==1,b==2> is not supported.');
+        $this->expectExceptionMessage('Filter shape is not supported.');
 
         /** @When building the criteria from the query */
         Criteria::fromQuery(schema: $this->schema, request: $query);
@@ -168,9 +168,9 @@ final class FilterTest extends TestCase
         /** @Given a query whose parentheses nest an OR group inside an AND group */
         $query = Query::from(parameters: ['filter' => '(a==1,b==2);c==3']);
 
-        /** @Then an exception carrying the raw filter query string is raised */
+        /** @Then an exception indicating the filter shape is not supported is raised */
         $this->expectException(FilterShapeNotSupported::class);
-        $this->expectExceptionMessage('Filter shape <(a==1,b==2);c==3> is not supported.');
+        $this->expectExceptionMessage('Filter shape is not supported.');
 
         /** @When building the criteria from the query */
         Criteria::fromQuery(schema: $this->schema, request: $query);
@@ -221,7 +221,7 @@ final class FilterTest extends TestCase
 
         /** @Then an exception indicating the value does not match the expected kind is raised */
         $this->expectException(FilterValueNotAllowed::class);
-        $this->expectExceptionMessage('does not match the datetime kind');
+        $this->expectExceptionMessage('Value does not match the datetime kind for filter field <created_at>.');
 
         /** @When building the criteria from the query */
         Criteria::fromQuery(schema: $schema, request: $query);
@@ -240,6 +240,26 @@ final class FilterTest extends TestCase
             [Comparison::of(field: 'status', values: ['paid'], operator: Operator::EQUAL)],
             $comparisons
         );
+    }
+
+    public function testFromQueryWhenPersonalValueBreaksKindThenMessageOmitsTheValue(): void
+    {
+        /** @Given a schema expecting a UUID kind on the client_id field */
+        $schema = Schema::create()->filterable(
+            field: 'client_id',
+            operators: [Operator::EQUAL],
+            valueKind: ValueKind::UUID
+        );
+
+        /** @And a query whose value is a client name instead of a UUID */
+        $query = Query::from(parameters: ['filter' => 'client_id=="Maria Silva"']);
+
+        /** @Then an exception naming only the kind and the field is raised */
+        $this->expectException(FilterValueNotAllowed::class);
+        $this->expectExceptionMessageMatches('/^Value does not match the uuid kind for filter field <client_id>\.$/');
+
+        /** @When building the criteria from the query */
+        Criteria::fromQuery(schema: $schema, request: $query);
     }
 
     public function testFromQueryWhenDateTimeValueMatchesKindThenComparisonIsReturned(): void
@@ -292,7 +312,7 @@ final class FilterTest extends TestCase
 
         /** @Then an exception indicating the value is not permitted is raised */
         $this->expectException(FilterValueNotAllowed::class);
-        $this->expectExceptionMessage('Value <shipped> is not permitted for filter field <status>.');
+        $this->expectExceptionMessage('Value is not permitted for filter field <status>.');
 
         /** @When building the criteria from the query */
         Criteria::fromQuery(schema: $schema, request: $query);
@@ -341,6 +361,19 @@ final class FilterTest extends TestCase
 
         /** @Then the only comparison carries the expected operator */
         self::assertEquals([Comparison::of(field: 'a', values: ['b'], operator: $expected)], $comparisons);
+    }
+
+    public function testFromQueryWhenMalformedPersonalValueThenMessageOmitsTheExpression(): void
+    {
+        /** @Given a query whose filter leaves the quoted client name unclosed */
+        $query = Query::from(parameters: ['filter' => 'name=="Maria Silva']);
+
+        /** @Then an exception carrying no part of the filter expression is raised */
+        $this->expectException(FilterExpressionIsInvalid::class);
+        $this->expectExceptionMessageMatches('/^Filter expression is invalid and could not be parsed\.$/');
+
+        /** @When building the criteria from the query */
+        Criteria::fromQuery(schema: $this->schema, request: $query);
     }
 
     public function testFromQueryWhenOperatorNotAllowedThenThrowsFilterOperatorNotAllowed(): void
@@ -403,7 +436,7 @@ final class FilterTest extends TestCase
 
         /** @Then an exception indicating the filter expression is invalid is raised */
         $this->expectException(FilterExpressionIsInvalid::class);
-        $this->expectExceptionMessage('could not be parsed');
+        $this->expectExceptionMessage('Filter expression is invalid and could not be parsed.');
 
         /** @When building the criteria from the query */
         Criteria::fromQuery(schema: $this->schema, request: $query);
@@ -428,6 +461,19 @@ final class FilterTest extends TestCase
         Criteria::fromQuery(schema: $schema, request: $query);
     }
 
+    public function testFromQueryWhenDisjunctionOfPersonalValuesThenMessageOmitsTheExpression(): void
+    {
+        /** @Given a query whose filter is an OR group of two client names */
+        $query = Query::from(parameters: ['filter' => 'name=="Maria Silva",name=="Joao Souza"']);
+
+        /** @Then an exception carrying no part of the filter expression is raised */
+        $this->expectException(FilterShapeNotSupported::class);
+        $this->expectExceptionMessageMatches('/^Filter shape is not supported\.$/');
+
+        /** @When building the criteria from the query */
+        Criteria::fromQuery(schema: $this->schema, request: $query);
+    }
+
     public function testFromQueryWhenFilterNestedBeyondTheMaximumDepthThenThrowsFilterExpressionIsInvalid(): void
     {
         /** @Given a filter template wrapping a comparison in placeholders */
@@ -440,7 +486,7 @@ final class FilterTest extends TestCase
 
         /** @Then an exception indicating the filter expression is invalid is raised */
         $this->expectException(FilterExpressionIsInvalid::class);
-        $this->expectExceptionMessage('could not be parsed');
+        $this->expectExceptionMessage('Filter expression is invalid and could not be parsed.');
 
         /** @When building the criteria from the query */
         Criteria::fromQuery(schema: $this->schema, request: $query);
