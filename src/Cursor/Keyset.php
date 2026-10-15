@@ -10,6 +10,7 @@ use TinyBlocks\HttpQuery\Filter;
 use TinyBlocks\HttpQuery\Internal\Cursor\SortKeys;
 use TinyBlocks\HttpQuery\Limit;
 use TinyBlocks\HttpQuery\Order;
+use TinyBlocks\HttpQuery\PreservedParameters;
 use TinyBlocks\HttpQuery\Sort;
 
 /**
@@ -25,6 +26,7 @@ final readonly class Keyset
     private function __construct(
         private Sort $sort,
         private Filter $filter,
+        private ?PreservedParameters $preserved,
         private Pagination $pagination,
         private Sort $submittedSort
     ) {
@@ -37,11 +39,24 @@ final readonly class Keyset
      * @param Filter $filter The filter preserved in every rendered URI.
      * @param Pagination $pagination The cursor pagination carrying the incoming cursor and the limit.
      * @param Sort $submittedSort The submitted sort preserved in every rendered URI.
+     * @param PreservedParameters|null $preserved The query parameters preserved in every rendered URI, or null
+     * for none.
      * @return Keyset The cursor view.
      */
-    public static function from(Sort $sort, Filter $filter, Pagination $pagination, Sort $submittedSort): Keyset
-    {
-        return new Keyset(sort: $sort, filter: $filter, pagination: $pagination, submittedSort: $submittedSort);
+    public static function from(
+        Sort $sort,
+        Filter $filter,
+        Pagination $pagination,
+        Sort $submittedSort,
+        ?PreservedParameters $preserved = null
+    ): Keyset {
+        return new Keyset(
+            sort: $sort,
+            filter: $filter,
+            preserved: $preserved,
+            pagination: $pagination,
+            submittedSort: $submittedSort
+        );
     }
 
     /**
@@ -62,7 +77,8 @@ final readonly class Keyset
             items: $items,
             filter: $this->filter,
             keysOf: ($keysOf ?? SortKeys::from(sort: $this->sort)),
-            pagination: $this->pagination
+            pagination: $this->pagination,
+            preserved: $this->preserved
         );
     }
 

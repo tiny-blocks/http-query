@@ -8,6 +8,7 @@ use PHPUnit\Framework\TestCase;
 use ReflectionClass;
 use ReflectionMethod;
 use Test\TinyBlocks\HttpQuery\Models\Query;
+use TinyBlocks\Http\LinkRelation;
 use TinyBlocks\HttpQuery\Comparison;
 use TinyBlocks\HttpQuery\Group;
 use TinyBlocks\HttpQuery\Internal\Rsql\Renderer;
@@ -18,6 +19,7 @@ use TinyBlocks\HttpQuery\Navigation;
 use TinyBlocks\HttpQuery\Offset\Criteria;
 use TinyBlocks\HttpQuery\Offset\Pagination;
 use TinyBlocks\HttpQuery\Operator;
+use TinyBlocks\HttpQuery\PreservedParameters;
 use TinyBlocks\HttpQuery\Sort;
 
 final class LinksTest extends TestCase
@@ -383,6 +385,34 @@ final class LinksTest extends TestCase
 
         /** @Then the static-only RSQL renderer is instantiated */
         self::assertInstanceOf(Renderer::class, $renderer);
+    }
+
+    public function testToArrayWhenPreservedParametersGivenThenEveryUriCarriesThemBeforeThePagination(): void
+    {
+        /** @Given the parameters every navigation URI preserves */
+        $preserved = PreservedParameters::from(parameters: ['from' => '2026-10-01', 'to' => '2026-10-31']);
+
+        /** @And a navigation exposing the next page */
+        $navigation = Navigation::empty()->with(
+            target: Pagination::fromPage(page: 2, perPage: 20),
+            relation: LinkRelation::NEXT
+        );
+
+        /** @When rendering the navigation for a sorted page carrying those parameters */
+        $links = Links::from(
+            self: Pagination::fromPage(page: 1, perPage: 20),
+            sort: Sort::fromExpression(expression: 'id'),
+            filter: Group::none(),
+            baseUri: '/v1/overrides',
+            navigation: $navigation,
+            preserved: $preserved
+        );
+
+        /** @Then the self and next links carry the parameters between the sort and the pagination */
+        self::assertSame([
+            'self' => '/v1/overrides?sort=id&from=2026-10-01&to=2026-10-31&page[number]=1&page[size]=20',
+            'next' => '/v1/overrides?sort=id&from=2026-10-01&to=2026-10-31&page[number]=2&page[size]=20'
+        ], $links->toArray());
     }
 
     public function testToArrayWhenValueCarriesUnsafeAndStructuralCharactersThenEncodesOnlyTheUnsafeOnes(): void

@@ -13,10 +13,11 @@ use TinyBlocks\HttpQuery\Internal\WebLink;
 /**
  * Navigation of a result, rendered as a JSON:API body links object or an RFC 8288 Link header.
  *
- * <p>It renders uniformly over a {@see Navigation}, building each URI from the given filter and sort
- * plus the pagination of the self link and of every target, so the filter and the sort are
- * preserved in every URI. The self link is built from the page's own current pagination, so a cursor
- * page renders a cursor self and an offset page renders an offset self.</p>
+ * <p>It renders uniformly over a {@see Navigation}, building each URI from the given filter, sort, and
+ * preserved parameters plus the pagination of the self link and of every target, so the filter, the
+ * sort, and the preserved parameters are kept in every URI. The self link is built from the page's own
+ * current pagination, so a cursor page renders a cursor self and an offset page renders an offset
+ * self.</p>
  */
 final readonly class Links
 {
@@ -35,6 +36,7 @@ final readonly class Links
      * @param Filter $filter The filter preserved in every URI.
      * @param string $baseUri The base URI the navigation URIs are built on.
      * @param Navigation $navigation The navigation the result exposes.
+     * @param PreservedParameters|null $preserved The query parameters preserved in every URI, or null for none.
      * @return Links The navigation for the result.
      */
     public static function from(
@@ -42,12 +44,16 @@ final readonly class Links
         Sort $sort,
         Filter $filter,
         string $baseUri,
-        Navigation $navigation
+        Navigation $navigation,
+        ?PreservedParameters $preserved = null
     ): Links {
+        $preservedParameters = ($preserved ?? PreservedParameters::from(parameters: []));
+
         $uriFor = static fn(Pagination $pagination): string => Uri::from(
             sort: $sort,
             filter: $filter,
             baseUri: $baseUri,
+            preserved: $preservedParameters,
             pagination: $pagination
         );
 

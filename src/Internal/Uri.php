@@ -7,6 +7,7 @@ namespace TinyBlocks\HttpQuery\Internal;
 use TinyBlocks\HttpQuery\Filter;
 use TinyBlocks\HttpQuery\Internal\Rsql\Renderer;
 use TinyBlocks\HttpQuery\Pagination;
+use TinyBlocks\HttpQuery\PreservedParameters;
 use TinyBlocks\HttpQuery\Sort;
 
 final class Uri
@@ -15,8 +16,13 @@ final class Uri
     {
     }
 
-    public static function from(Sort $sort, Filter $filter, string $baseUri, Pagination $pagination): string
-    {
+    public static function from(
+        Sort $sort,
+        Filter $filter,
+        string $baseUri,
+        PreservedParameters $preserved,
+        Pagination $pagination
+    ): string {
         $parameters = [];
 
         if (!$filter->isEmpty()) {
@@ -27,6 +33,12 @@ final class Uri
         if (!$sort->isEmpty()) {
             $template = 'sort=%s';
             $parameters[] = sprintf($template, Uri::encode(value: $sort->toExpression()));
+        }
+
+        $preservedQuery = $preserved->toQueryString();
+
+        if ($preservedQuery !== '') {
+            $parameters[] = $preservedQuery;
         }
 
         $parameters[] = $pagination->toQueryString();

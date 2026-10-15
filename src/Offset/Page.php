@@ -17,6 +17,7 @@ use TinyBlocks\HttpQuery\Internal\Offset\PageNumber;
 use TinyBlocks\HttpQuery\Internal\Offset\Total;
 use TinyBlocks\HttpQuery\Internal\Rendering;
 use TinyBlocks\HttpQuery\Navigation;
+use TinyBlocks\HttpQuery\PreservedParameters;
 use TinyBlocks\HttpQuery\Sort;
 
 /**
@@ -37,6 +38,7 @@ final readonly class Page
         private Filter $filter,
         private OffsetNavigation $paging,
         private PageCount $pageCount,
+        private ?PreservedParameters $preserved,
         private Pagination $pagination,
         private array $extraMetadata
     ) {
@@ -51,11 +53,19 @@ final readonly class Page
      * @param iterable<TElement> $items The items on the current page.
      * @param Filter $filter The filter preserved in every rendered URI.
      * @param Pagination $pagination The pagination describing the current page.
+     * @param PreservedParameters|null $preserved The query parameters preserved in every rendered URI, or null
+     * for none.
      * @return Page<TElement> The page carrying the items, the total, and the navigation.
      * @throws TotalIsNegative If the total is less than 0.
      */
-    public static function from(Sort $sort, iterable $items, int $total, Filter $filter, Pagination $pagination): Page
-    {
+    public static function from(
+        Sort $sort,
+        iterable $items,
+        int $total,
+        Filter $filter,
+        Pagination $pagination,
+        ?PreservedParameters $preserved = null
+    ): Page {
         $count = Total::from(value: $total);
         $limit = Limit::from(value: $pagination->limit());
         $pageCount = $count->pageCount(limit: $limit);
@@ -74,6 +84,7 @@ final readonly class Page
                 pagination: $pagination
             ),
             pageCount: $pageCount,
+            preserved: $preserved,
             pagination: $pagination,
             extraMetadata: []
         );
@@ -211,6 +222,7 @@ final readonly class Page
             filter: $this->filter,
             baseUri: $baseUri,
             metadata: $this->metadata(),
+            preserved: $this->preserved,
             navigation: $this->navigation()
         );
     }
@@ -264,6 +276,7 @@ final readonly class Page
             filter: $this->filter,
             paging: $this->paging,
             pageCount: $this->pageCount,
+            preserved: $this->preserved,
             pagination: $this->pagination,
             extraMetadata: [...$this->extraMetadata, ...$metadata]
         );

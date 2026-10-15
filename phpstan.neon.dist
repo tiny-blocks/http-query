@@ -47,6 +47,11 @@ parameters:
           path: src/Internal/AllowedField.php
         - identifier: missingType.iterableValue
           path: src/Internal/AllowedFilters.php
+        # The preserved parameters arrive as the parsed query string and leave as a list of encoded pairs.
+        - identifier: missingType.iterableValue
+          path: src/Internal/PreservedPairs.php
+        - identifier: argument.type
+          path: src/Internal/PreservedPairs.php
         # reduce() folds the links into the associative body; phpstan widens the carry to array<mixed>.
         - identifier: return.type
           path: src/Links.php

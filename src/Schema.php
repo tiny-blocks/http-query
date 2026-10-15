@@ -11,17 +11,20 @@ use TinyBlocks\HttpQuery\Exceptions\FilterOperatorNotAllowed;
 use TinyBlocks\HttpQuery\Exceptions\FilterShapeNotSupported;
 use TinyBlocks\HttpQuery\Exceptions\FilterValueNotAllowed;
 use TinyBlocks\HttpQuery\Exceptions\PageSizeOutOfRange;
+use TinyBlocks\HttpQuery\Exceptions\PreservedParameterIsInvalid;
 use TinyBlocks\HttpQuery\Exceptions\SortFieldNotAllowed;
 use TinyBlocks\HttpQuery\Internal\AllowedFilters;
 use TinyBlocks\HttpQuery\Internal\Conjunction;
 use TinyBlocks\HttpQuery\Internal\Cursor\CursorKeys;
+use TinyBlocks\HttpQuery\Internal\ParameterName;
 
 /**
  * Declarative contract of the query an endpoint accepts, used to validate an incoming request.
  *
  * <p>It declares the filterable fields with their permitted operators, values, and kinds, the
  * client-sortable fields, the kind each cursor key value must match, the sort applied when the
- * client sends none, and the page-size bounds.
+ * client sends none, the page-size bounds, and the other query parameters every navigation URI
+ * preserves.
  * The query parameter names follow JSON:API and are fixed: <code>filter</code>, <code>sort</code>,
  * and the <code>page</code> family. The default page size is 20 and the maximum is 100.</p>
  */
@@ -30,6 +33,7 @@ final readonly class Schema
     private function __construct(
         private AllowedFilters $allowed,
         private Sort $byDefault,
+        private array $preserved,
         private CursorKeys $cursorKeys,
         private int $maxPerPage,
         private int $defaultPerPage,
@@ -75,6 +79,7 @@ final readonly class Schema
         return new Schema(
             allowed: AllowedFilters::createFromEmpty(),
             byDefault: Sort::fromExpression(expression: ''),
+            preserved: [],
             cursorKeys: CursorKeys::createFromEmpty(),
             maxPerPage: 100,
             defaultPerPage: 20,
@@ -116,6 +121,7 @@ final readonly class Schema
         return new Schema(
             allowed: $this->allowed,
             byDefault: $this->byDefault,
+            preserved: $this->preserved,
             cursorKeys: $this->cursorKeys,
             maxPerPage: $this->maxPerPage,
             defaultPerPage: $this->defaultPerPage,
@@ -158,6 +164,7 @@ final readonly class Schema
         return new Schema(
             allowed: $this->allowed,
             byDefault: $this->byDefault,
+            preserved: $this->preserved,
             cursorKeys: $this->cursorKeys->with(kind: $valueKind, field: $field),
             maxPerPage: $this->maxPerPage,
             defaultPerPage: $this->defaultPerPage,
@@ -189,6 +196,7 @@ final readonly class Schema
                 operators: $operators
             ),
             byDefault: $this->byDefault,
+            preserved: $this->preserved,
             cursorKeys: $this->cursorKeys,
             maxPerPage: $this->maxPerPage,
             defaultPerPage: $this->defaultPerPage,
@@ -209,8 +217,38 @@ final readonly class Schema
         return new Schema(
             allowed: $this->allowed,
             byDefault: $this->byDefault,
+            preserved: $this->preserved,
             cursorKeys: $this->cursorKeys,
             maxPerPage: $maxPerPage,
+            defaultPerPage: $this->defaultPerPage,
+            sortableFields: $this->sortableFields,
+            allowsDisjunction: $this->allowsDisjunction
+        );
+    }
+
+    /**
+     * Returns a copy of the Schema declaring the query parameters every navigation URI preserves.
+     *
+     * <p>The parameters sit outside the filter, sort, and page families, a time window bounding the
+     * collection for example. Each one the request carries is copied into the self link and into every
+     * navigation link, so following a link keeps the window. A declared parameter the request omits is
+     * left out. The declaration replaces any previous one.</p>
+     *
+     * @param list<string> $parameters The names of the query parameters every navigation URI preserves.
+     * @return Schema A copy carrying the preserved parameter names.
+     * @throws PreservedParameterIsInvalid If a name is empty, bracketed, or one of filter, sort, or page.
+     */
+    public function preserving(array $parameters): Schema
+    {
+        return new Schema(
+            allowed: $this->allowed,
+            byDefault: $this->byDefault,
+            preserved: array_flip(array_map(
+                static fn(string $name): string => ParameterName::from(value: $name)->value,
+                $parameters
+            )),
+            cursorKeys: $this->cursorKeys,
+            maxPerPage: $this->maxPerPage,
             defaultPerPage: $this->defaultPerPage,
             sortableFields: $this->sortableFields,
             allowsDisjunction: $this->allowsDisjunction
@@ -228,6 +266,7 @@ final readonly class Schema
         return new Schema(
             allowed: $this->allowed,
             byDefault: $sort,
+            preserved: $this->preserved,
             cursorKeys: $this->cursorKeys,
             maxPerPage: $this->maxPerPage,
             defaultPerPage: $this->defaultPerPage,
@@ -252,6 +291,19 @@ final readonly class Schema
         }
 
         return $size;
+    }
+
+    /**
+     * Returns the declared parameters the request carries, preserved in every navigation URI.
+     *
+     * @param array<array-key, mixed> $parameters The query parameters parsed from the request.
+     * @return PreservedParameters The declared parameters present in the request, in the request order.
+     * @throws PreservedParameterIsInvalid If a declared parameter carries a value that is not a string or a
+     * nested array of strings.
+     */
+    public function preservedFor(array $parameters): PreservedParameters
+    {
+        return PreservedParameters::from(parameters: array_intersect_key($parameters, $this->preserved));
     }
 
     /**
@@ -295,6 +347,7 @@ final readonly class Schema
         return new Schema(
             allowed: $this->allowed,
             byDefault: $this->byDefault,
+            preserved: $this->preserved,
             cursorKeys: $this->cursorKeys,
             maxPerPage: $this->maxPerPage,
             defaultPerPage: $defaultPerPage,
@@ -313,6 +366,7 @@ final readonly class Schema
         return new Schema(
             allowed: $this->allowed,
             byDefault: $this->byDefault,
+            preserved: $this->preserved,
             cursorKeys: $this->cursorKeys,
             maxPerPage: $this->maxPerPage,
             defaultPerPage: $this->defaultPerPage,

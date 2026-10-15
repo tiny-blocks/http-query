@@ -10,6 +10,7 @@ use TinyBlocks\Http\Server\Decoded\QueryParameters;
 use TinyBlocks\HttpQuery\Filter;
 use TinyBlocks\HttpQuery\Group;
 use TinyBlocks\HttpQuery\Internal\Rsql\FilterParser;
+use TinyBlocks\HttpQuery\PreservedParameters;
 use TinyBlocks\HttpQuery\Schema;
 use TinyBlocks\HttpQuery\Sort;
 
@@ -19,6 +20,7 @@ final readonly class Query
         private Sort $sort,
         private Filter $filter,
         private int $pageSize,
+        private PreservedParameters $preserved,
         private int $pageNumber,
         private array $comparisons,
         private string $cursorToken,
@@ -43,6 +45,7 @@ final readonly class Query
             sort: $schema->sortFor(sort: $submittedSort),
             filter: $filter,
             pageSize: $schema->pageSizeFor(requested: $size->toString() === '' ? null : $size->toInteger()),
+            preserved: $schema->preservedFor(parameters: $parameters->toArray()),
             pageNumber: $number->toString() === '' ? 1 : $number->toInteger(),
             comparisons: $schema->comparisonsFor(filter: $filter, expression: $expression),
             cursorToken: $cursor->toString(),
@@ -63,6 +66,11 @@ final readonly class Query
     public function pageSize(): int
     {
         return $this->pageSize;
+    }
+
+    public function preserved(): PreservedParameters
+    {
+        return $this->preserved;
     }
 
     public function pageNumber(): int
