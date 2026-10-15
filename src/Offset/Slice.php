@@ -12,6 +12,7 @@ use TinyBlocks\HttpQuery\Internal\Offset\OffsetNavigation;
 use TinyBlocks\HttpQuery\Internal\Rendering;
 use TinyBlocks\HttpQuery\Internal\Window;
 use TinyBlocks\HttpQuery\Navigation;
+use TinyBlocks\HttpQuery\PreservedParameters;
 use TinyBlocks\HttpQuery\Sort;
 
 /**
@@ -29,6 +30,7 @@ final readonly class Slice
         private Collection $items,
         private Filter $filter,
         private OffsetNavigation $paging,
+        private ?PreservedParameters $preserved,
         private Pagination $pagination
     ) {
     }
@@ -44,10 +46,17 @@ final readonly class Slice
      * @param iterable<TElement> $items The items fetched for the page size plus one.
      * @param Filter $filter The filter preserved in every rendered URI.
      * @param Pagination $pagination The pagination describing the current page.
+     * @param PreservedParameters|null $preserved The query parameters preserved in every rendered URI, or null
+     * for none.
      * @return Slice<TElement> The slice carrying the trimmed items and the next-page hint.
      */
-    public static function from(Sort $sort, iterable $items, Filter $filter, Pagination $pagination): Slice
-    {
+    public static function from(
+        Sort $sort,
+        iterable $items,
+        Filter $filter,
+        Pagination $pagination,
+        ?PreservedParameters $preserved = null
+    ): Slice {
         /** @var Collection<TElement> $collection */
         $collection = Collection::createFrom(elements: $items);
         $window = Window::from(items: $collection, limit: $pagination->limit());
@@ -60,6 +69,7 @@ final readonly class Slice
             items: $trimmed,
             filter: $filter,
             paging: OffsetNavigation::from(hasNext: $window->hasNext(), pagination: $pagination),
+            preserved: $preserved,
             pagination: $pagination
         );
     }
@@ -168,6 +178,7 @@ final readonly class Slice
             filter: $this->filter,
             baseUri: $baseUri,
             metadata: $this->metadata(),
+            preserved: $this->preserved,
             navigation: $this->navigation()
         );
     }

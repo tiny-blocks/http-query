@@ -4,10 +4,12 @@ declare(strict_types=1);
 
 namespace Test\TinyBlocks\HttpQuery\Unit;
 
+use PHPUnit\Framework\Attributes\DataProvider;
 use PHPUnit\Framework\TestCase;
 use ReflectionClass;
 use ReflectionMethod;
 use TinyBlocks\HttpQuery\Exceptions\PageSizeOutOfRange;
+use TinyBlocks\HttpQuery\Exceptions\PreservedParameterIsInvalid;
 use TinyBlocks\HttpQuery\Internal\Conjunction;
 use TinyBlocks\HttpQuery\Schema;
 
@@ -149,6 +151,21 @@ final class SchemaTest extends TestCase
         $schema->defaultPerPage(defaultPerPage: 0);
     }
 
+    #[DataProvider('invalidNameCases')]
+    public function testPreservingWhenNameIsInvalidThenThrowsPreservedParameterIsInvalid(string $name): void
+    {
+        /** @Given a parameter name that is empty, bracketed, or reserved */
+
+        /** @Then an exception indicating the preserved parameter is invalid is raised */
+        $this->expectException(PreservedParameterIsInvalid::class);
+        $this->expectExceptionMessage(
+            sprintf('Preserved parameter name <%s> is empty, bracketed, or reserved.', $name)
+        );
+
+        /** @When declaring it as a parameter every navigation URI preserves */
+        Schema::create()->preserving(parameters: ['from', $name]);
+    }
+
     public function testConstructorWhenInvokedThroughReflectionThenInstantiatesTheStaticOnlyConjunction(): void
     {
         /** @Given an uninitialized instance of the static-only conjunction flattener */
@@ -159,5 +176,35 @@ final class SchemaTest extends TestCase
 
         /** @Then the static-only conjunction flattener is instantiated */
         self::assertInstanceOf(Conjunction::class, $flattener);
+    }
+
+    public function testPreservedForWhenUndeclaredParameterPresentThenKeepsOnlyTheDeclaredInRequestOrder(): void
+    {
+        /** @Given a schema preserving the window bounds and a parameter the request omits */
+        $schema = Schema::create()->preserving(parameters: ['from', 'to', 'timezone']);
+
+        /** @When reading the preserved parameters out of query parameters carrying an undeclared one */
+        $actual = $schema->preservedFor(parameters: [
+            'to'    => '2026-10-31',
+            'page'  => ['size' => '1'],
+            'from'  => '2026-10-01',
+            'debug' => 'true'
+        ]);
+
+        /** @Then only the declared parameters the request carries are kept, in the request order */
+        self::assertSame('to=2026-10-31&from=2026-10-01', $actual->toQueryString());
+    }
+
+    public static function invalidNameCases(): array
+    {
+        return [
+            'Empty'               => ['name' => ''],
+            'Page family'         => ['name' => 'page'],
+            'Sort parameter'      => ['name' => 'sort'],
+            'Filter parameter'    => ['name' => 'filter'],
+            'Opening bracket'     => ['name' => 'window['],
+            'Closing bracket'     => ['name' => 'window]'],
+            'Bracketed path name' => ['name' => 'window[from]']
+        ];
     }
 }

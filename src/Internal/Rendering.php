@@ -11,6 +11,7 @@ use TinyBlocks\HttpQuery\Filter;
 use TinyBlocks\HttpQuery\Links;
 use TinyBlocks\HttpQuery\Navigation;
 use TinyBlocks\HttpQuery\Pagination;
+use TinyBlocks\HttpQuery\PreservedParameters;
 use TinyBlocks\HttpQuery\Sort;
 
 final class Rendering
@@ -26,9 +27,17 @@ final class Rendering
         Filter $filter,
         string $baseUri,
         array $metadata,
+        ?PreservedParameters $preserved,
         Navigation $navigation
     ): ResponseInterface {
-        $links = Links::from(self: $self, sort: $sort, filter: $filter, baseUri: $baseUri, navigation: $navigation);
+        $links = Links::from(
+            self: $self,
+            sort: $sort,
+            filter: $filter,
+            baseUri: $baseUri,
+            navigation: $navigation,
+            preserved: $preserved
+        );
 
         return Response::ok([
             'data'  => $items->toArray(),

@@ -12,6 +12,7 @@ use TinyBlocks\HttpQuery\Filter;
 use TinyBlocks\HttpQuery\Internal\Cursor\Seek;
 use TinyBlocks\HttpQuery\Internal\Rendering;
 use TinyBlocks\HttpQuery\Navigation;
+use TinyBlocks\HttpQuery\PreservedParameters;
 use TinyBlocks\HttpQuery\Sort;
 
 /**
@@ -30,6 +31,7 @@ final readonly class Page
         private Collection $items,
         private Filter $filter,
         private bool $hasNext,
+        private ?PreservedParameters $preserved,
         private Token $nextCursor,
         private Pagination $pagination,
         private array $extraMetadata
@@ -49,6 +51,8 @@ final readonly class Page
      * @param Filter $filter The filter preserved in every rendered URI.
      * @param Closure(TElement): list<mixed> $keysOf Extracts the ordering key values from an element.
      * @param Pagination $pagination The pagination describing the current page.
+     * @param PreservedParameters|null $preserved The query parameters preserved in every rendered URI, or null
+     * for none.
      * @return Page<TElement> The cursor page carrying the trimmed items and the next cursor.
      */
     public static function from(
@@ -56,7 +60,8 @@ final readonly class Page
         iterable $items,
         Filter $filter,
         Closure $keysOf,
-        Pagination $pagination
+        Pagination $pagination,
+        ?PreservedParameters $preserved = null
     ): Page {
         /** @var Collection<TElement> $collection */
         $collection = Collection::createFrom(elements: $items);
@@ -67,6 +72,7 @@ final readonly class Page
             items: $seek->items(),
             filter: $filter,
             hasNext: $seek->hasNext(),
+            preserved: $preserved,
             nextCursor: $seek->next(),
             pagination: $pagination,
             extraMetadata: []
@@ -90,6 +96,7 @@ final readonly class Page
             items: $items,
             filter: $this->filter,
             hasNext: $this->hasNext,
+            preserved: $this->preserved,
             nextCursor: $this->nextCursor,
             pagination: $this->pagination,
             extraMetadata: $this->extraMetadata
@@ -172,6 +179,7 @@ final readonly class Page
             filter: $this->filter,
             baseUri: $baseUri,
             metadata: $this->metadata(),
+            preserved: $this->preserved,
             navigation: $this->navigation()
         );
     }
@@ -193,6 +201,7 @@ final readonly class Page
             items: $this->items,
             filter: $this->filter,
             hasNext: $this->hasNext,
+            preserved: $this->preserved,
             nextCursor: $this->nextCursor,
             pagination: $this->pagination,
             extraMetadata: [...$this->extraMetadata, ...$metadata]

@@ -18,6 +18,7 @@ use TinyBlocks\HttpQuery\Exceptions\SortFieldNotAllowed;
 use TinyBlocks\HttpQuery\Exceptions\SortIsRequired;
 use TinyBlocks\HttpQuery\Filter;
 use TinyBlocks\HttpQuery\Internal\Query;
+use TinyBlocks\HttpQuery\PreservedParameters;
 use TinyBlocks\HttpQuery\Schema;
 use TinyBlocks\HttpQuery\Sort;
 
@@ -34,6 +35,7 @@ final readonly class Criteria
     private function __construct(
         private Sort $sort,
         private Filter $filter,
+        private PreservedParameters $preserved,
         private Pagination $pagination,
         private array $comparisons,
         private Sort $submittedSort
@@ -70,6 +72,7 @@ final readonly class Criteria
         return new Criteria(
             sort: $query->sort(),
             filter: $query->filter(),
+            preserved: $query->preserved(),
             pagination: Pagination::from(cursor: $cursor, perPage: $query->pageSize()),
             comparisons: $query->comparisons(),
             submittedSort: $query->submittedSort()
@@ -136,7 +139,8 @@ final readonly class Criteria
             sort: $this->sort,
             filter: $this->filter,
             pagination: $this->pagination,
-            submittedSort: $this->submittedSort
+            submittedSort: $this->submittedSort,
+            preserved: $this->preserved
         );
     }
 

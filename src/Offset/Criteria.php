@@ -19,6 +19,7 @@ use TinyBlocks\HttpQuery\Exceptions\TotalIsNegative;
 use TinyBlocks\HttpQuery\Filter;
 use TinyBlocks\HttpQuery\Internal\Query;
 use TinyBlocks\HttpQuery\Limit;
+use TinyBlocks\HttpQuery\PreservedParameters;
 use TinyBlocks\HttpQuery\Schema;
 use TinyBlocks\HttpQuery\Sort;
 
@@ -35,6 +36,7 @@ final readonly class Criteria
     private function __construct(
         private Sort $sort,
         private Filter $filter,
+        private PreservedParameters $preserved,
         private Pagination $pagination,
         private array $comparisons,
         private Sort $submittedSort
@@ -67,6 +69,7 @@ final readonly class Criteria
         return new Criteria(
             sort: $query->sort(),
             filter: $query->filter(),
+            preserved: $query->preserved(),
             pagination: Pagination::fromPage(page: $query->pageNumber(), perPage: $query->pageSize()),
             comparisons: $query->comparisons(),
             submittedSort: $query->submittedSort()
@@ -111,7 +114,8 @@ final readonly class Criteria
             items: $items,
             total: $total,
             filter: $this->filter,
-            pagination: $this->pagination
+            pagination: $this->pagination,
+            preserved: $this->preserved
         );
     }
 
@@ -148,7 +152,8 @@ final readonly class Criteria
             sort: $this->submittedSort,
             items: $items,
             filter: $this->filter,
-            pagination: $this->pagination
+            pagination: $this->pagination,
+            preserved: $this->preserved
         );
     }
 
