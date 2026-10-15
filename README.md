@@ -12,6 +12,7 @@
     + [Cursor pagination](#cursor-pagination)
     + [Building the store query](#building-the-store-query)
     + [Rendering navigation links](#rendering-navigation-links)
+    + [Preserving other query parameters](#preserving-other-query-parameters)
 * [FAQ](#faq)
 * [License](#license)
 * [Contributing](#contributing)
@@ -601,6 +602,79 @@ $response = $keyset->page(items: $items)
 The pagination entries come first, and the supplied ones follow in the order they were given. A supplied key that
 repeats a pagination key is discarded, so `withMetadata(metadata: ['per_page' => 99])` leaves `per_page` on the real
 page size. Calling it more than once accumulates.
+
+### Preserving other query parameters
+
+An endpoint often bounds its collection with query parameters outside `filter`, `sort`, and `page`, a time window for
+example. Declare their names with `preserving` on the schema. The criteria read each declared parameter from the
+request, and every link, in the body and in the `Link` header, carries it as the request sent it, between the sort and
+the pagination. Following a link then keeps the window. A declared parameter the request omits is left out, an
+undeclared one is never copied, and without the declaration the links stay as they were.
+
+```php
+<?php
+
+declare(strict_types=1);
+
+use Psr\Http\Message\ServerRequestInterface;
+use TinyBlocks\HttpQuery\Offset\Criteria;
+use TinyBlocks\HttpQuery\Schema;
+
+$schema = Schema::create()->preserving(parameters: ['from', 'to']);
+
+# GET /v1/availability-overrides?from=2026-10-01T00:00:00Z&to=2026-10-31T23:59:59Z&page[size]=20
+/** @var ServerRequestInterface $request */
+$criteria = Criteria::fromQuery(schema: $schema, request: $request);
+
+/** @var iterable<mixed> $items */
+$response = $criteria->page(items: $items, total: 45)->toResponse(baseUri: '/v1/availability-overrides');
+```
+
+```json
+{
+    "links": {
+        "self": "/v1/availability-overrides?from=2026-10-01T00%3A00%3A00Z&to=2026-10-31T23%3A59%3A59Z&page[number]=1&page[size]=20",
+        "first": "/v1/availability-overrides?from=2026-10-01T00%3A00%3A00Z&to=2026-10-31T23%3A59%3A59Z&page[number]=1&page[size]=20",
+        "next": "/v1/availability-overrides?from=2026-10-01T00%3A00%3A00Z&to=2026-10-31T23%3A59%3A59Z&page[number]=2&page[size]=20",
+        "last": "/v1/availability-overrides?from=2026-10-01T00%3A00%3A00Z&to=2026-10-31T23%3A59%3A59Z&page[number]=3&page[size]=20"
+    }
+}
+```
+
+A cursor page preserves them the same way, so the `next` link of a waitlist scoped by a released slot keeps the slot:
+
+```php
+<?php
+
+declare(strict_types=1);
+
+use Psr\Http\Message\ServerRequestInterface;
+use TinyBlocks\HttpQuery\Cursor\Criteria;
+use TinyBlocks\HttpQuery\Schema;
+use TinyBlocks\HttpQuery\Sort;
+
+$schema = Schema::create()
+    ->sortable(fields: ['created_at', 'id'])
+    ->preserving(parameters: ['slot_start_time', 'slot_end_time'])
+    ->defaultSort(sort: Sort::fromExpression(expression: 'created_at,id'));
+
+# GET /v1/eligible-waitlist-entries?slot_start_time=2026-10-14T10:00:00Z&slot_end_time=2026-10-14T11:00:00Z&page[size]=1
+/** @var ServerRequestInterface $request */
+$keyset = Criteria::fromQuery(schema: $schema, request: $request)->keyset();
+
+# links.next: /v1/eligible-waitlist-entries?slot_start_time=2026-10-14T10%3A00%3A00Z
+#             &slot_end_time=2026-10-14T11%3A00%3A00Z&page[cursor]=...&page[size]=1
+/** @var iterable<array{id: string, created_at: string}> $items */
+$response = $keyset->page(items: $items)->toResponse(baseUri: '/v1/eligible-waitlist-entries');
+```
+
+| Rule          | Behavior                                                                                          |
+|---------------|---------------------------------------------------------------------------------------------------|
+| Encoding      | Every name, key, and value is percent-encoded, so `:` renders as `%3A` and `+` as `%2B`.          |
+| Brackets      | Declaring `window` carries `window[from]` and `window[to]` under literal bracketed keys.          |
+| Names         | Empty, bracketed, `filter`, `sort`, and `page` raise `PreservedParameterIsInvalid` when declared. |
+| Values        | A value other than a string or a nested array of strings raises `PreservedParameterIsInvalid`.    |
+| Links by hand | `Links::from` and the page factories take an optional `PreservedParameters`.                      |
 
 ## FAQ
 
