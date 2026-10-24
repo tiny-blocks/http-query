@@ -27,14 +27,14 @@
     "require": {
         "php": "^8.5",
         "tiny-blocks/collection": "^2.6",
-        "tiny-blocks/http": "^7.0"
+        "tiny-blocks/http": "^7.2"
     },
     "require-dev": {
-        "ergebnis/composer-normalize": "^2.52",
-        "infection/infection": "^0.34",
+        "ergebnis/composer-normalize": "^2.54",
+        "infection/infection": "^0.35",
         "nyholm/psr7": "^1.8",
-        "phpstan/phpstan": "^2.2",
-        "phpunit/phpunit": "^13.2",
+        "phpstan/phpstan": "^2.3",
+        "phpunit/phpunit": "^13.4",
         "slevomat/coding-standard": "^8.31",
         "squizlabs/php_codesniffer": "^4.0"
     },
@@ -75,7 +75,7 @@
         "test-file": "@php ./vendor/bin/phpunit --configuration phpunit.xml --no-coverage --filter",
         "tests": [
             "@php -d memory_limit=2G ./vendor/bin/phpunit --configuration phpunit.xml tests",
-            "@php ./vendor/bin/infection --threads=max --logger-html=reports/coverage/mutation-report.html --coverage=reports/coverage"
+            "@php ./vendor/bin/infection --threads=max --logger-html=reports/coverage/mutation-report.html"
         ]
     }
 }

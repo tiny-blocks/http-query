@@ -38,60 +38,6 @@ final class FiltersTest extends TestCase
         self::assertSame(['filter_0' => 1], $filters->parameters());
     }
 
-    public function testFromWhenOperatorStartsWithThenRendersAnchoredLikeAndAppendsTheWildcard(): void
-    {
-        /** @Given a prefix comparison over a name field */
-        $comparison = Comparison::of(field: 'name', values: ['jose'], operator: Operator::STARTS_WITH);
-
-        /** @When the predicate is assembled */
-        $filters = Filters::from(
-            columns: FilterColumns::create()->plain(field: 'name', column: 'cli.name'),
-            comparisons: [$comparison]
-        );
-
-        /** @Then the predicate anchors the prefix and only the trailing wildcard is added */
-        self::assertSame("cli.name LIKE :filter_0 ESCAPE '!'", $filters->sql());
-        self::assertSame(['filter_0' => 'jose%'], $filters->parameters());
-    }
-
-    #[DataProvider('wildcardCases')]
-    public function testFromWhenPrefixCarriesAWildcardThenNeutralizesIt(string $value, string $bound): void
-    {
-        /** @Given a prefix whose raw value carries a character LIKE would read as a wildcard or an escape */
-
-        /** @When the predicate is assembled */
-        $filters = Filters::from(
-            columns: FilterColumns::create()->plain(field: 'name', column: 'cli.name'),
-            comparisons: [Comparison::of(field: 'name', values: [$value], operator: Operator::STARTS_WITH)]
-        );
-
-        /** @Then the character binds escaped, so it matches literally instead of expanding */
-        self::assertSame(['filter_0' => $bound], $filters->parameters());
-    }
-
-    public function testConstructorWhenInvokedThroughReflectionThenInstantiatesTheStaticOnlyPrefix(): void
-    {
-        /** @Given an uninitialized instance of the static-only prefix anchor */
-        $anchor = new ReflectionClass(AnchoredPrefix::class)->newInstanceWithoutConstructor();
-
-        /** @When invoking its otherwise-uncallable private constructor */
-        new ReflectionMethod(AnchoredPrefix::class, '__construct')->invoke($anchor);
-
-        /** @Then the static-only prefix anchor is instantiated */
-        self::assertInstanceOf(AnchoredPrefix::class, $anchor);
-    }
-
-    public static function wildcardCases(): array
-    {
-        return [
-            'percent'     => ['value' => '100%', 'bound' => '100!%%'],
-            'escape char' => ['value' => 'a!b', 'bound' => 'a!!b%'],
-            'underscore'  => ['value' => 'a_b', 'bound' => 'a!_b%'],
-            'backslash'   => ['value' => 'a\\b', 'bound' => 'a\\b%'],
-            'no wildcard' => ['value' => 'jose', 'bound' => 'jose%']
-        ];
-    }
-
     public function testFromWhenFieldHasNoColumnMappingThenThrows(): void
     {
         /** @Given a comparison over a field absent from the column mapping */
@@ -239,6 +185,21 @@ final class FiltersTest extends TestCase
         self::assertTrue($filters->isEmpty());
         self::assertSame('', $filters->sql());
         self::assertSame([], $filters->parameters());
+    }
+
+    #[DataProvider('wildcardCases')]
+    public function testFromWhenPrefixCarriesAWildcardThenNeutralizesIt(string $value, string $bound): void
+    {
+        /** @Given a prefix whose raw value carries a character LIKE would read as a wildcard or an escape */
+
+        /** @When the predicate is assembled */
+        $filters = Filters::from(
+            columns: FilterColumns::create()->plain(field: 'name', column: 'cli.name'),
+            comparisons: [Comparison::of(field: 'name', values: [$value], operator: Operator::STARTS_WITH)]
+        );
+
+        /** @Then the character binds escaped, so it matches literally instead of expanding */
+        self::assertSame(['filter_0' => $bound], $filters->parameters());
     }
 
     public function testFromTreeWhenEmptyGroupThenYieldsAnEmptyPredicate(): void
@@ -520,6 +481,34 @@ final class FiltersTest extends TestCase
         self::assertSame(['filter_0' => '%acme%'], $filters->parameters());
     }
 
+    public function testFromWhenOperatorStartsWithThenRendersAnchoredLikeAndAppendsTheWildcard(): void
+    {
+        /** @Given a prefix comparison over a name field */
+        $comparison = Comparison::of(field: 'name', values: ['jose'], operator: Operator::STARTS_WITH);
+
+        /** @When the predicate is assembled */
+        $filters = Filters::from(
+            columns: FilterColumns::create()->plain(field: 'name', column: 'cli.name'),
+            comparisons: [$comparison]
+        );
+
+        /** @Then the predicate anchors the prefix and only the trailing wildcard is added */
+        self::assertSame("cli.name LIKE :filter_0 ESCAPE '!'", $filters->sql());
+        self::assertSame(['filter_0' => 'jose%'], $filters->parameters());
+    }
+
+    public function testConstructorWhenInvokedThroughReflectionThenInstantiatesTheStaticOnlyPrefix(): void
+    {
+        /** @Given an uninitialized instance of the static-only prefix anchor */
+        $anchor = new ReflectionClass(AnchoredPrefix::class)->newInstanceWithoutConstructor();
+
+        /** @When invoking its otherwise-uncallable private constructor */
+        new ReflectionMethod(AnchoredPrefix::class, '__construct')->invoke($anchor);
+
+        /** @Then the static-only prefix anchor is instantiated */
+        self::assertInstanceOf(AnchoredPrefix::class, $anchor);
+    }
+
     public function testFromTreeWhenNestedGroupThenRendersEachGroupParenthesizedWithThreadedOffsets(): void
     {
         /** @Given an AND group nesting an OR group */
@@ -551,5 +540,16 @@ final class FiltersTest extends TestCase
             $filters->sql()
         );
         self::assertSame(['filter_0' => 'PAID', 'filter_1' => '100', 'filter_2' => '200'], $filters->parameters());
+    }
+
+    public static function wildcardCases(): array
+    {
+        return [
+            'percent'     => ['value' => '100%', 'bound' => '100!%%'],
+            'escape char' => ['value' => 'a!b', 'bound' => 'a!!b%'],
+            'underscore'  => ['value' => 'a_b', 'bound' => 'a!_b%'],
+            'backslash'   => ['value' => 'a\\b', 'bound' => 'a\\b%'],
+            'no wildcard' => ['value' => 'jose', 'bound' => 'jose%']
+        ];
     }
 }
