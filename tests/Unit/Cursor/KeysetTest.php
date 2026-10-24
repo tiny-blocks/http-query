@@ -125,6 +125,21 @@ final class KeysetTest extends TestCase
         self::assertSame(['created_at' => '2023-01-15T10:30:00Z', 'id' => 5], $cursor);
     }
 
+    public function testCriteriaWhenTokenCannotBeDecodedThenThrowsCursorIsInvalid(): void
+    {
+        /** @Given a request carrying a token that never came out of the codec */
+        $request = Query::from(
+            parameters: ['sort' => 'created_at,id', 'page' => ['cursor' => 'not-a-cursor', 'size' => '2']]
+        );
+
+        /** @Then an exception indicating the cursor is invalid is raised */
+        $this->expectException(CursorIsInvalid::class);
+        $this->expectExceptionMessage('Cursor token is invalid and could not be decoded.');
+
+        /** @When the criteria is parsed from the request */
+        Criteria::fromQuery(schema: $this->schema, request: $request);
+    }
+
     public function testCriteriaWhenDecodedCountMismatchesThenThrowsCursorIsInvalid(): void
     {
         /** @Given an opaque token carrying a single key value */
@@ -137,21 +152,6 @@ final class KeysetTest extends TestCase
 
         /** @Then an exception indicating the cursor is invalid is raised */
         $this->expectException(CursorIsInvalid::class);
-
-        /** @When the criteria is parsed from the request */
-        Criteria::fromQuery(schema: $this->schema, request: $request);
-    }
-
-    public function testCriteriaWhenTokenCannotBeDecodedThenThrowsCursorIsInvalid(): void
-    {
-        /** @Given a request carrying a token that never came out of the codec */
-        $request = Query::from(
-            parameters: ['sort' => 'created_at,id', 'page' => ['cursor' => 'not-a-cursor', 'size' => '2']]
-        );
-
-        /** @Then an exception indicating the cursor is invalid is raised */
-        $this->expectException(CursorIsInvalid::class);
-        $this->expectExceptionMessage('Cursor token is invalid and could not be decoded.');
 
         /** @When the criteria is parsed from the request */
         Criteria::fromQuery(schema: $this->schema, request: $request);
