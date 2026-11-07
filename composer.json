@@ -27,7 +27,7 @@
     "require": {
         "php": "^8.5",
         "tiny-blocks/collection": "^2.6",
-        "tiny-blocks/http": "^7.2"
+        "tiny-blocks/http": "^8.0"
     },
     "require-dev": {
         "ergebnis/composer-normalize": "^2.54",
