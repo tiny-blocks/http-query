@@ -6,6 +6,7 @@ namespace TinyBlocks\HttpQuery;
 
 use TinyBlocks\Collection\Collection;
 use TinyBlocks\HttpQuery\Exceptions\SortExpressionIsInvalid;
+use TinyBlocks\HttpQuery\Internal\SortToken;
 
 /**
  * Ordered set of sort fields parsed from a JSON:API-style sort expression.
@@ -37,18 +38,10 @@ final readonly class Sort
             return new Sort(orders: []);
         }
 
-        $orders = array_map(static function (string $token) use ($expression): Order {
-            $descending = str_starts_with($token, '-');
-            $field = $descending ? substr($token, 1) : $token;
-
-            if (preg_match('/^\w[\w.-]*$/', $field) !== 1) {
-                throw SortExpressionIsInvalid::from(expression: $expression);
-            }
-
-            $direction = $descending ? Direction::DESCENDING : Direction::ASCENDING;
-
-            return Order::from(field: $field, direction: $direction);
-        }, explode(',', $trimmed));
+        $orders = array_map(
+            static fn(string $token): Order => SortToken::from(token: $token, expression: $expression)->toOrder(),
+            explode(',', $trimmed)
+        );
 
         return new Sort(orders: $orders);
     }
